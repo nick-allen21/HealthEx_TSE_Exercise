@@ -22,7 +22,7 @@ The reason is simple: Phase 2 is not just about discovering endpoints, but about
 - local environment: `environment.yml` with `python=3.11`, `nodejs=22`, and `openjdk=21`
 - app scaffold: `src/app`
 - Synthea workflow: documented in `docs/phase1_foundation.md`
-- local demo-ready patient set: `tmp/synthea-output/demo-ready-10/`
+- committed demo-ready patient set: `data/patients/`
 
 Recommended patient order:
 1. Primary: `Louis_Dietrich_b9ef6c40-d234-adb6-b44b-45d664d33cd3.json`

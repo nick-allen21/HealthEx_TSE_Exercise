@@ -20,6 +20,7 @@ At the moment, this repo contains:
 - agent operating rules in `AGENT_README.md`
 - the Phase 1 foundation doc in `docs/phase1_foundation.md`
 - the shared local environment files `environment.yml` and `.env.example`
+- the committed demo patient dataset in `data/patients`
 - the initial Next.js application scaffold in `src/app`
 - the root app config in `package.json`, `tsconfig.json`, `next.config.ts`, and `eslint.config.mjs`
 - the remaining phase docs in `docs/`
@@ -30,6 +31,7 @@ At the moment, this repo contains:
 - `IMPLEMENTATION_PLAN.md`: living technical source of truth, decisions, and TODOs
 - `AGENT_README.md`: operating rules for agents working in this directory
 - `package.json`: app scripts and JavaScript dependencies
+- `data/patients`: committed synthetic FHIR bundles for the interactive demo set
 - `src/app`: Next.js App Router entrypoint for the web UI
 - `docs/phase1_foundation.md`: Phase 1 foundation decisions and setup notes
 - `docs/phase2_fhir_queries_shaping.md`: Phase 2 API investigation and FHIR shaping handoff
@@ -64,6 +66,7 @@ Current setup files:
 - `environment.yml`: shared Conda environment with Python and Node.js
 - `.env.example`: starter environment variables for FHIR access and patient selection
 - `.gitignore`: protection for local env files and future build artifacts
+- `data/patients`: committed reviewer-friendly synthetic patient dataset and manifest
 - `src/app/page.tsx`: minimal landing page and Phase 1 placeholder UI
 
 ### Synthea Workflow Notes
@@ -93,7 +96,7 @@ Current guidance from initial runs:
 - use `-a 18-65` when we want adult immunization-demo candidates
 - treat the Synthea seed as a reproducible batch identifier, not the primary quality lever
 
-Phase 1 also produced a local 10-patient demo-ready Synthea set and a recommended primary patient plus backups. The exact shortlist and tuned generation notes live in `docs/phase1_foundation.md`.
+Phase 1 also produced a committed 10-patient demo-ready Synthea set in `data/patients` plus a recommended primary patient and backups. The exact shortlist and tuned generation notes live in `docs/phase1_foundation.md`.
 
 ## Current Technical Direction
 

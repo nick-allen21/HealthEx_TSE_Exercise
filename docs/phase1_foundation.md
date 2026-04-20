@@ -21,7 +21,7 @@ Completed outcomes:
 - scaffolded the initial Next.js application shell
 - documented and tested the Synthea workflow locally
 - tuned Synthea for demo usefulness in the local temp workflow
-- packaged a local 10-patient demo-ready shortlist
+- packaged and committed a 10-patient demo-ready shortlist for reviewer use
 
 Phase 2 now owns:
 - HealthEx FHIR API investigation
@@ -79,8 +79,9 @@ Open validation item for later phases:
 
 - Synthea is the primary synthetic-patient source for this exercise.
 - For now, keep the Synthea runtime outside this repository and treat it as a local tool dependency.
-- Do not commit the Synthea JAR, cloned Synthea repo, or generated output bundles into this repo.
-- Generated files may be written to `tmp/synthea-output/` inside this repo during evaluation; that path is gitignored.
+- Do not commit the Synthea JAR, cloned Synthea repo, or broad exploratory generation output into this repo.
+- Generated exploratory files may be written to `tmp/synthea-output/` during evaluation; that path is gitignored.
+- The curated reviewer-facing patient set is the exception and lives in `data/patients/`.
 
 ### Prerequisites
 
@@ -209,11 +210,11 @@ These settings improved demo quality by:
 ### Current demo-ready patient set
 
 We packaged a 10-patient demo set at:
-- `tmp/synthea-output/demo-ready-10/`
+- `data/patients/`
 
 Manifest files:
-- `tmp/synthea-output/demo-ready-10/manifest.md`
-- `tmp/synthea-output/demo-ready-10/manifest.json`
+- `data/patients/manifest.md`
+- `data/patients/manifest.json`
 
 Selected patients:
 - `Lawana_Kayleen_Johns_bba7bba7-a4c9-85d9-4f24-23d8fdd47b6d.json`
@@ -238,6 +239,9 @@ Recommended backups:
 
 The next phase should start from the selected patient set above rather than rerunning broad Synthea exploration.
 
+Reviewer-facing note:
+- the selected patient set has been promoted out of `tmp/` and committed in `data/patients/` so the demo can run without requiring reviewers to install or run Synthea first
+
 Recommended continuity:
 - the same agent who investigates the HealthEx APIs should carry the first implementation pass for those APIs
 - Phase 2 should begin by validating whether `Louis_Dietrich_b9ef6c40-d234-adb6-b44b-45d664d33cd3.json` can be represented through the HealthEx workflow, with the listed backups available if not
@@ -249,6 +253,7 @@ Phase 1 should create only the minimum structure needed for downstream work.
 
 Expected top-level areas:
 - `src/app/` for the Next.js App Router application
+- `data/` for committed synthetic demo data and related manifests
 - `docs/` for phase docs and deeper technical notes
 - `scripts/` if helper tooling is needed for Synthea or data inspection
 - root config and env example files only as needed

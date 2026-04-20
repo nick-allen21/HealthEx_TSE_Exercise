@@ -123,6 +123,7 @@ Current phase-doc status:
 | Initial scaffold shape | The app starts as a minimal Next.js App Router scaffold rooted at `src/app` | Gives Phase 2 a clean place to add FHIR retrieval and summary UI work |
 | Local Synthea placement | Keep Synthea as an external local tool for now and document the runbook rather than vendoring the generator into this repo | Keeps the repo lightweight while Phase 1 focuses on workflow clarity |
 | Synthea runtime dependency | The shared Conda environment should include OpenJDK so Synthea runs without extra machine-specific setup | Keeps the synthetic-data workflow reproducible for future agents |
+| Demo patient packaging | Commit the curated synthetic demo set in `data/patients` so reviewers can run the app without generating data first | Improves reviewer reproducibility while keeping exploratory generation output out of the repo |
 | Patient strategy | Phase 1 will generate about 5 curated synthetic patients using the Synthea JAR | Gives us realistic structured FHIR data while letting us optimize the demo data we want to show |
 | Phase continuity | When API investigation is part of the work, the same agent should carry the first implementation pass when possible | Reduces context loss between discovery and execution |
 | Stretch work | We plan to complete all three stretch items from the brief | The extra validation and AI work improves the strength of the submission |
@@ -151,6 +152,7 @@ These reflect the current technical direction. Some items below are now locked, 
 
 - Fetch the patient and relevant related resources from the HealthEx FHIR endpoint.
 - Generate about 5 synthetic patients with the Synthea JAR in Phase 1 so we have realistic data we can tune for the demo.
+- Commit the curated reviewer-facing patient set in `data/patients` rather than serving raw bundles from `public/`.
 - Prefer adult age filtering during exploration when the goal is to support immunization-gap analysis.
 - Use Python only for support tooling if it materially helps with patient-data generation or analysis.
 - Normalize the returned data into UI-ready sections.
