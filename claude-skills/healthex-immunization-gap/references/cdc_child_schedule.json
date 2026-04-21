@@ -1,0 +1,138 @@
+{
+  "source": "CDC Child and Adolescent Immunization Schedule",
+  "source_url": "https://www.cdc.gov/vaccines/hcp/imz-schedules/child-adolescent-age.html",
+  "version_date": "2026-04-21",
+  "retrieved": "2026-04-21",
+  "notes": "Author-curated public skill snapshot for common pediatric and adolescent vaccine series. This is simplified for broad self-install use and does not replace full catch-up interval logic or special-population guidance.",
+  "schedule": [
+    {
+      "antigen": "Hepatitis B",
+      "antigen_group": "hepb",
+      "cvx_codes": [8],
+      "ages": "Birth through adolescence",
+      "logic": {
+        "type": "min_dose_count",
+        "required_doses": 3
+      },
+      "notes": "Simplified childhood series count."
+    },
+    {
+      "antigen": "DTaP",
+      "antigen_group": "dtap",
+      "cvx_codes": [20],
+      "ages": "Infancy through childhood",
+      "logic": {
+        "type": "min_dose_count",
+        "required_doses": 5
+      },
+      "notes": "Catch-up timing details are simplified here."
+    },
+    {
+      "antigen": "IPV",
+      "antigen_group": "ipv",
+      "cvx_codes": [10],
+      "ages": "Infancy through childhood",
+      "logic": {
+        "type": "min_dose_count",
+        "required_doses": 4
+      },
+      "notes": "Catch-up timing details are simplified here."
+    },
+    {
+      "antigen": "Hib",
+      "antigen_group": "hib",
+      "cvx_codes": [48, 49],
+      "ages": "Infancy through early childhood",
+      "logic": {
+        "type": "context_required"
+      },
+      "notes": "Required dose count depends on product and age at series start."
+    },
+    {
+      "antigen": "Pneumococcal conjugate",
+      "antigen_group": "pcv",
+      "cvx_codes": [100, 133],
+      "ages": "Infancy through early childhood",
+      "logic": {
+        "type": "context_required"
+      },
+      "notes": "Product and catch-up requirements vary."
+    },
+    {
+      "antigen": "MMR",
+      "antigen_group": "mmr",
+      "cvx_codes": [3],
+      "ages": "Childhood and adolescence",
+      "logic": {
+        "type": "min_dose_count",
+        "required_doses": 2
+      },
+      "notes": "Simplified childhood series count."
+    },
+    {
+      "antigen": "Varicella",
+      "antigen_group": "varicella",
+      "cvx_codes": [21],
+      "ages": "Childhood and adolescence",
+      "logic": {
+        "type": "min_dose_count",
+        "required_doses": 2
+      },
+      "notes": "Evidence of immunity may also come from disease history or labs."
+    },
+    {
+      "antigen": "Hepatitis A",
+      "antigen_group": "hepa",
+      "cvx_codes": [83],
+      "ages": "Childhood and adolescence",
+      "logic": {
+        "type": "min_dose_count",
+        "required_doses": 2
+      },
+      "notes": "Simplified childhood series count."
+    },
+    {
+      "antigen": "HPV",
+      "antigen_group": "hpv",
+      "cvx_codes": [165],
+      "ages": "Preteen through young adult",
+      "logic": {
+        "type": "context_required"
+      },
+      "notes": "2-dose vs 3-dose logic depends on age at series initiation and immune status."
+    },
+    {
+      "antigen": "MenACWY",
+      "antigen_group": "menacwy",
+      "cvx_codes": [114],
+      "ages": "Adolescence",
+      "logic": {
+        "type": "min_dose_count",
+        "required_doses": 2
+      },
+      "notes": "Simplified adolescent series count."
+    },
+    {
+      "antigen": "Influenza",
+      "antigen_group": "influenza",
+      "cvx_codes": [140, 150, 155],
+      "ages": "6 months and older",
+      "logic": {
+        "type": "annual",
+        "interval_years": 1
+      },
+      "notes": "Recommend annual influenza vaccination."
+    },
+    {
+      "antigen": "COVID-19",
+      "antigen_group": "covid19-pfizer",
+      "cvx_codes": [208, 217, 309],
+      "ages": "Age-specific seasonal review",
+      "logic": {
+        "type": "annual",
+        "interval_years": 1
+      },
+      "notes": "Simplified seasonal review. Verify age-specific CDC guidance for the current season."
+    }
+  ]
+}

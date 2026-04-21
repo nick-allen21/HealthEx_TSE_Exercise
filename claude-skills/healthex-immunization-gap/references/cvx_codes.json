@@ -1,0 +1,109 @@
+{
+  "source": "CDC IIS CVX code set",
+  "source_url": "https://www2a.cdc.gov/vaccines/iis/iisstandards/vaccines.asp?rpt=cvx",
+  "version_date": "2026-04-21",
+  "retrieved": "2026-04-21",
+  "notes": "Curated subset for the public immunization-gap skill. This file maps observed and common public-facing CVX codes to antigen groups and display names used by the portable schedule logic.",
+  "codes": [
+    {
+      "cvx": 3,
+      "display_name": "MMR",
+      "antigen_group": "mmr"
+    },
+    {
+      "cvx": 8,
+      "display_name": "Hepatitis B, pediatric/adolescent",
+      "antigen_group": "hepb"
+    },
+    {
+      "cvx": 10,
+      "display_name": "IPV",
+      "antigen_group": "ipv"
+    },
+    {
+      "cvx": 20,
+      "display_name": "DTaP",
+      "antigen_group": "dtap"
+    },
+    {
+      "cvx": 21,
+      "display_name": "Varicella",
+      "antigen_group": "varicella"
+    },
+    {
+      "cvx": 48,
+      "display_name": "Hib PRP-T",
+      "antigen_group": "hib"
+    },
+    {
+      "cvx": 49,
+      "display_name": "Hib PRP-OMP",
+      "antigen_group": "hib"
+    },
+    {
+      "cvx": 83,
+      "display_name": "Hepatitis A, pediatric/adolescent",
+      "antigen_group": "hepa"
+    },
+    {
+      "cvx": 100,
+      "display_name": "PCV7",
+      "antigen_group": "pcv"
+    },
+    {
+      "cvx": 114,
+      "display_name": "MenACWY",
+      "antigen_group": "menacwy"
+    },
+    {
+      "cvx": 115,
+      "display_name": "Tdap",
+      "antigen_group": "tdap"
+    },
+    {
+      "cvx": 133,
+      "display_name": "PCV13",
+      "antigen_group": "pcv"
+    },
+    {
+      "cvx": 140,
+      "display_name": "Influenza trivalent injectable",
+      "antigen_group": "influenza"
+    },
+    {
+      "cvx": 150,
+      "display_name": "Influenza quadrivalent injectable",
+      "antigen_group": "influenza"
+    },
+    {
+      "cvx": 155,
+      "display_name": "Influenza live intranasal",
+      "antigen_group": "influenza"
+    },
+    {
+      "cvx": 163,
+      "display_name": "MenB",
+      "antigen_group": "menb"
+    },
+    {
+      "cvx": 165,
+      "display_name": "HPV9",
+      "antigen_group": "hpv"
+    },
+    {
+      "cvx": 208,
+      "display_name": "COVID-19 Pfizer original",
+      "antigen_group": "covid19-pfizer"
+    },
+    {
+      "cvx": 217,
+      "display_name": "COVID-19 Pfizer updated tris-sucrose",
+      "antigen_group": "covid19-pfizer"
+    },
+    {
+      "cvx": 309,
+      "display_name": "COVID-19 Pfizer 12Y+ 30 mcg/0.3 mL",
+      "antigen_group": "covid19-pfizer"
+    }
+  ]
+}

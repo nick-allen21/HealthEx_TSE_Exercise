@@ -1,0 +1,59 @@
+{
+  "source": "ECDC Vaccine Scheduler",
+  "source_url": "https://vaccine-schedule.ecdc.europa.eu/",
+  "version_date": "2026-04-21",
+  "retrieved": "2026-04-21",
+  "notes": "Author-curated public skill snapshot for Europe-aware routing. ECDC guidance is country-specific, so this file is best used as a decision aid to route the skill toward ECDC framing and to highlight when the answer depends on the user's country.",
+  "schedule": [
+    {
+      "antigen": "Influenza",
+      "antigen_group": "influenza",
+      "cvx_codes": [140, 150, 155],
+      "ages": "Country-specific",
+      "logic": {
+        "type": "context_required"
+      },
+      "notes": "Use for Europe-aware answers, but confirm the user's country-specific schedule."
+    },
+    {
+      "antigen": "COVID-19",
+      "antigen_group": "covid19-pfizer",
+      "cvx_codes": [208, 217, 309],
+      "ages": "Country-specific",
+      "logic": {
+        "type": "context_required"
+      },
+      "notes": "Use for Europe-aware answers, but confirm the current country-specific schedule."
+    },
+    {
+      "antigen": "Tdap or Td booster",
+      "antigen_group": "tdap",
+      "cvx_codes": [115],
+      "ages": "Country-specific",
+      "logic": {
+        "type": "context_required"
+      },
+      "notes": "Booster timing can vary by national implementation."
+    },
+    {
+      "antigen": "MMR",
+      "antigen_group": "mmr",
+      "cvx_codes": [3],
+      "ages": "Country-specific",
+      "logic": {
+        "type": "context_required"
+      },
+      "notes": "Use as a routing cue; final interpretation should mention national schedule variation."
+    },
+    {
+      "antigen": "HPV",
+      "antigen_group": "hpv",
+      "cvx_codes": [165],
+      "ages": "Country-specific",
+      "logic": {
+        "type": "context_required"
+      },
+      "notes": "Country recommendations differ in age and gender coverage."
+    }
+  ]
+}

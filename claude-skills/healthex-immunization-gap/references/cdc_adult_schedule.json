@@ -1,0 +1,103 @@
+{
+  "source": "CDC Recommended Adult Immunization Schedule",
+  "source_url": "https://www.cdc.gov/vaccines/hcp/imz-schedules/adult-age.html",
+  "version_date": "2026-04-21",
+  "retrieved": "2026-04-21",
+  "notes": "Author-curated public skill snapshot for common adult immunization questions. This is not a complete clinical forecasting engine and should be verified against the live CDC schedule for edge cases, risk-based indications, and shared decision-making scenarios.",
+  "schedule": [
+    {
+      "antigen": "Influenza",
+      "antigen_group": "influenza",
+      "cvx_codes": [140, 150, 155],
+      "ages": "19 years and older",
+      "logic": {
+        "type": "annual",
+        "interval_years": 1
+      },
+      "notes": "Recommend annual influenza vaccination."
+    },
+    {
+      "antigen": "COVID-19",
+      "antigen_group": "covid19-pfizer",
+      "cvx_codes": [208, 217, 309],
+      "ages": "19 years and older",
+      "logic": {
+        "type": "annual",
+        "interval_years": 1
+      },
+      "notes": "Simplified seasonal review for public skill use. Verify current season-specific CDC guidance."
+    },
+    {
+      "antigen": "Tdap or Td booster",
+      "antigen_group": "tdap",
+      "cvx_codes": [115],
+      "ages": "19 years and older",
+      "logic": {
+        "type": "interval_years",
+        "interval_years": 10
+      },
+      "notes": "Simplified adult booster rule after documented primary history."
+    },
+    {
+      "antigen": "MMR",
+      "antigen_group": "mmr",
+      "cvx_codes": [3],
+      "ages": "Adults without evidence of immunity",
+      "logic": {
+        "type": "at_least_one"
+      },
+      "notes": "Evidence of immunity may also come from labs or prior documentation. Risk-based contexts can change the recommendation."
+    },
+    {
+      "antigen": "Varicella",
+      "antigen_group": "varicella",
+      "cvx_codes": [21],
+      "ages": "Adults without evidence of immunity",
+      "logic": {
+        "type": "min_dose_count",
+        "required_doses": 2
+      },
+      "notes": "Evidence of immunity may also come from prior disease history or labs."
+    },
+    {
+      "antigen": "Hepatitis B",
+      "antigen_group": "hepb",
+      "cvx_codes": [8],
+      "ages": "Adults with age- and risk-based recommendation differences",
+      "logic": {
+        "type": "context_required"
+      },
+      "notes": "Use supporting context and current CDC guidance because recommendation strength varies by age and risk profile."
+    },
+    {
+      "antigen": "HPV",
+      "antigen_group": "hpv",
+      "cvx_codes": [165],
+      "ages": "Adults with age-based recommendation differences",
+      "logic": {
+        "type": "context_required"
+      },
+      "notes": "Routine and shared decision-making recommendations vary by age and prior series history."
+    },
+    {
+      "antigen": "MenACWY",
+      "antigen_group": "menacwy",
+      "cvx_codes": [114],
+      "ages": "Risk-based adult recommendation",
+      "logic": {
+        "type": "context_required"
+      },
+      "notes": "Use only when travel, college, military, or other risk context is present."
+    },
+    {
+      "antigen": "MenB",
+      "antigen_group": "menb",
+      "cvx_codes": [163],
+      "ages": "Risk-based adult recommendation",
+      "logic": {
+        "type": "context_required"
+      },
+      "notes": "Use only when age/risk context supports review."
+    }
+  ]
+}

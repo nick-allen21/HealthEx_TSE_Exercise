@@ -18,6 +18,9 @@ Lower confidence when any of the following are missing or unclear:
 - major risk factors that affect indications
 - contraindications, prior disease history, or shared decision-making context
 - records that appear partial, duplicated, or contradictory
+- chart freshness suggests the record may be stale
+- the available history is mostly imported `PrimarySource=No` data
+- titers are needed to answer the user's actual question
 
 ## How To Behave With Missing Data
 
@@ -28,6 +31,8 @@ If the record is incomplete or contradictory:
 - provide cautious next steps when reasonable
 - avoid claiming a series is definitely complete or incomplete unless the record
   clearly supports it
+- avoid claiming that a user is immune when the answer really depends on labs,
+  prior disease, or clinician interpretation
 
 Use cautious phrasing such as:
 
@@ -35,12 +40,13 @@ Use cautious phrasing such as:
 - `this appears likely`
 - `this may still depend on outside records`
 - `I cannot determine this confidently from the current data`
+- `the HealthEx record may be stale or incomplete`
 
 ## Required Disclaimer Pattern
 
 End the response with a short disclaimer in this spirit:
 
 `This review is informational and based only on the available HealthEx record.
-Missing outside records, contraindications, or risk factors may change the
-recommendation. Please confirm immunization decisions with a qualified
-clinician.`
+Missing outside records, stale sync state, contraindications, titers, or risk
+factors may change the recommendation. Please confirm immunization decisions
+with a qualified clinician.`

@@ -148,6 +148,8 @@ Current phase-doc status:
 | Recommendation source | Use `CDC/ACIP` as the clinical source of truth and `CDC CDSi` as the implementation companion | Matches the assignment and keeps the authority hierarchy explicit |
 | Claude skill packaging | Ship a real uploadable skill folder under `claude-skills/healthex-immunization-gap/` | Gives reviewers a concrete artifact they can inspect and upload |
 | Skill input contract | Expect live HealthEx connector access and ask the user to connect HealthEx if tool access is unavailable | Keeps the skill grounded in record evidence rather than guesswork |
+| Skill engine shape | Use a hybrid skill package: strong workflow instructions plus bundled parser/normalizer helper scripts | Matches the HealthEx connector's real output formats and reduces brittle prompt-only parsing |
+| Public distribution shape | Keep the source skill in `claude-skills/healthex-immunization-gap/` and ship a release ZIP rooted as `immunization-gap-analysis/` | Preserves repo context while giving public users a clean installable artifact |
 
 ### Open Decisions
 
@@ -156,7 +158,7 @@ Current phase-doc status:
 | Token automation | Keep manual paste flow for now, or add a browser-side developer bridge later | Manual paste works today; auth automation can wait |
 | First emphasized resource types | Lead with whatever two resource types are best populated in the real record | Must satisfy the assignment while staying readable |
 | Immunization source quality | Use direct FHIR `Immunization` if available, or document limitations if it remains sparse | Needs validation against the real patient bundle |
-| Exact HealthEx MCP flow inside Claude | Confirm the precise connector/tool sequence needed to access the current patient record | The shipped skill assumes connector access, but live tool flow still needs end-to-end validation |
+| Exact HealthEx MCP flow inside Claude | Confirm the precise connector/tool sequence needed to access the current patient record | The shipped skill now encodes the documented tool flow, but live tool behavior still needs end-to-end validation |
 
 ## Proposed Technical Direction
 
@@ -189,6 +191,8 @@ Current phase-doc status:
 - Keep the analysis grounded in structured patient history when possible.
 - Document auth limitations clearly if MCP and FHIR continue to require different working flows.
 - Keep the uploadable skill package in `claude-skills/healthex-immunization-gap/`.
+- Treat `get_immunizations` as the primary immunization source, `update_and_check_recent_records` as the freshness gate, and `get_labs` as the first extension path for titer-aware questions.
+- Bundle machine-readable CDC and ECDC schedule snapshots plus CVX mapping data for public distribution.
 
 ## Master TODOs
 
@@ -218,11 +222,13 @@ Current phase-doc status:
 
 - [x] Choose the accredited immunization recommendation source
 - [ ] Validate whether FHIR `Immunization` is complete enough in the real record
-- [ ] Define the comparison rules we will use
+- [x] Define the comparison rules we will use
 - [x] Document limitations and non-clinical disclaimers needed for the demo
 - [ ] Confirm the exact HealthEx MCP workflow required for Claude
 - [x] Draft the Claude skill instructions
 - [x] Define what context the skill needs as input
+- [x] Add HealthEx-format parsing and normalization helpers to the skill package
+- [x] Add versioning, changelog, license, and release ZIP packaging for self-install distribution
 - [ ] Validate that the skill can identify gaps and produce a corrective schedule
 
 ### 5. Validation and polish
@@ -247,6 +253,7 @@ Current phase-doc status:
 - Immunization recommendations can become complex quickly, so we should avoid over-claiming clinical certainty.
 - The HealthEx MCP workflow may still require setup details not yet documented in this repo.
 - The uploaded skill and the local browser-token FHIR path rely on related but not identical access patterns, so reviewer instructions must keep that distinction clear.
+- HealthEx tool outputs are heterogeneous and require parser maintenance if the connector format changes.
 
 ## Handoff Notes For Future Phase Agents
 

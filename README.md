@@ -1,9 +1,84 @@
-# HealthEx Technical Exercise
+# Immunization Gap Analysis Skill
 
-This repository contains the technical implementation and project memory for the
-HealthEx candidate exercise.
+Analyze HealthEx immunization records against bundled CDC or ECDC guidance and
+get a corrective-action plan grounded in the user's available record history.
 
-## Project Goal
+## Prerequisites
+
+- Claude Pro or Claude Max access
+- Claude skill uploads enabled in the user's account
+- HealthEx connector installed and authenticated in Claude
+- access to the user's HealthEx records through that connector
+
+## Install
+
+1. Download `releases/immunization-gap-analysis-v1.0.0.zip`.
+2. In Claude, go to `Customize -> Skills -> + Create skill` and upload the ZIP.
+3. Enable the skill, then confirm the HealthEx connector is connected under
+   `Settings -> Connectors -> HealthEx`.
+
+## Example Prompts
+
+- `Am I up to date on my vaccines?`
+- `What vaccines do I still need based on my HealthEx records?`
+- `When did I last get a Tdap?`
+- `Do I appear immune to measles?`
+- `What shots or boosters should I ask my clinician about next?`
+
+## Example Output Excerpt
+
+```text
+Patient context
+- age band: adult
+- full paginated history pull completed: yes
+
+Record freshness
+- last synced: 2026-04-21
+
+Potential gaps or overdue items
+- Influenza: likely due - no recent dose appears within the expected annual window
+- Tdap or Td booster: possibly due pending missing history - the latest recorded dose appears older than the expected booster interval
+
+Corrective actions to consider
+- confirm outside vaccination history
+- discuss indicated vaccination with a clinician or pharmacist
+- verify whether any recent vaccines are missing from stale or unsynced records
+
+immunization-gap-analysis v1.0.0 · CDC Recommended Adult Immunization Schedule 2026-04-21 · synced 2026-04-21
+```
+
+## Medical Disclaimer
+
+This skill is for informational review of HealthEx-connected records only. It is
+not medical advice, may miss vaccines given outside connected systems, and
+should be treated as a records-based summary rather than a definitive clinical
+forecast. Confirm any gaps or next steps with a qualified clinician.
+
+See [docs/medical-disclaimer.md](docs/medical-disclaimer.md) for the fuller
+repo-level disclaimer.
+
+## Limitations
+
+- the skill only sees records available through the user's HealthEx connector
+- stale sync state can make a user appear due when the real issue is an outdated
+  chart
+- some vaccine recommendations require country, risk, contraindication, travel,
+  or shared decision-making context that may not be available
+- the bundled schedule snapshots are author-curated public references, not a
+  full production immunization forecasting engine
+
+## Releases And Versioning
+
+- public ZIP: `releases/immunization-gap-analysis-v1.0.0.zip`
+- skill changelog: `claude-skills/healthex-immunization-gap/CHANGELOG.md`
+- source package: `claude-skills/healthex-immunization-gap`
+
+## Repo Context
+
+This repository still contains the full technical implementation and project
+memory for the HealthEx candidate exercise.
+
+### Project Goal
 
 The technical portion of the exercise is to:
 - build a simple Web UI that displays a patient's clinical history in a readable format
@@ -35,6 +110,9 @@ Historical note:
 - `IMPLEMENTATION_PLAN.md`: living technical source of truth, decisions, and TODOs
 - `AGENT_README.md`: operating rules for agents working in this directory
 - `HealthEx_TSE_Exercise.md`: original assignment brief
+- `HealthEx_api_reference.md`: HealthEx connector behavior and schema notes for skill development
+- `LICENSE`: public redistribution license for the skill package
+- `releases/`: prebuilt public skill ZIP artifacts
 - `src/app`: Next.js App Router entrypoint for the web UI
 - `src/components/live-healthex-viewer.tsx`: browser-side live FHIR fetch flow
 - `src/lib/healthex-summary.ts`: shared FHIR bundle-to-summary shaping logic
@@ -47,6 +125,7 @@ Historical note:
 - `docs/phase4_claude_immunization_skill.md`: Phase 4 combined immunization and Claude/MCP notes
 - `docs/phase5_extensions_validation.md`: Phase 5 validation and polish notes
 - `docs/phase6_readme_submission.md`: Phase 6 evaluator-facing documentation notes
+- `docs/medical-disclaimer.md`: repo-level medical disclaimer for public skill packaging
 
 ## Setup And Run
 
@@ -99,7 +178,7 @@ This is useful when:
 Important caveat:
 - the saved fallback can become stale and may underrepresent the richer live browser pull
 
-## Claude Skill
+## Claude Skill Source
 
 The repo now includes an uploadable Claude skill package at
 `claude-skills/healthex-immunization-gap`.
@@ -111,21 +190,27 @@ app.
 Reviewer notes:
 
 1. Open the folder and inspect `SKILL.md` plus the `references/` files.
-2. Upload the folder as a custom Claude skill so `SKILL.md` is at the top level
-   of the uploaded directory.
+2. Prefer the prebuilt release ZIP so Claude receives the public
+   `immunization-gap-analysis/` folder as the ZIP root.
 3. Connect HealthEx in Claude and allow tool access before asking for an
    immunization-gap review.
 
 Current skill behavior:
 
 - activates for immunization-history, vaccine-gap, overdue-vaccine, catch-up,
-  or corrective-action requests
+  corrective-action, last-vaccine, and selected immunity/titer questions
 - uses `CDC/ACIP` as the clinical recommendation source and `CDC CDSi` as the
   implementation companion
 - expects live HealthEx connector access and should ask the user to connect
   HealthEx rather than guessing from incomplete context
-- returns likely current items, likely gaps, corrective actions, assumptions,
-  and a non-clinical disclaimer
+- starts with `update_and_check_recent_records`, then paginates
+  `get_immunizations` across the full history
+- normalizes immunization records by `CVX` and `OccurrenceDate`, not by the
+  free-text vaccine label
+- conditionally pulls `get_labs` for titer-aware immunity questions and other
+  HealthEx tools only when context requires them
+- returns freshness, data-quality flags, likely current items, likely gaps,
+  corrective actions, assumptions, and a non-clinical disclaimer
 
 ## Technical Notes
 
