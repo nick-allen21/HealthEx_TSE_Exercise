@@ -4,5 +4,4 @@ channels:
 dependencies:
   - python=3.11
   - nodejs=22
-  - openjdk=21
   - pip

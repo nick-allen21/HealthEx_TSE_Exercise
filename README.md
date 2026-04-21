@@ -1,6 +1,7 @@
 # HealthEx Technical Exercise
 
-This repository contains the technical planning and implementation work for the HealthEx candidate exercise.
+This repository contains the technical implementation and project memory for the
+HealthEx candidate exercise.
 
 ## Project Goal
 
@@ -10,41 +11,43 @@ The technical portion of the exercise is to:
 - use at least two required FHIR resource types in the summary
 - build a Claude skill using the HealthEx MCP server to identify immunization gaps and propose corrective actions
 
-## Current Status
+## Current Direction
 
-Phase 1 foundation work is complete. The repository is now entering Phase 2 FHIR/API investigation and data-shaping work.
+The project is now centered on a single patient-source strategy: the user's own
+HealthEx record.
 
-At the moment, this repo contains:
-- the original assignment brief in `HealthEx_TSE_Exercise.txt`
-- the living technical plan in `IMPLEMENTATION_PLAN.md`
-- agent operating rules in `AGENT_README.md`
-- the Phase 1 foundation doc in `docs/phase1_foundation.md`
-- the shared local environment files `environment.yml` and `.env.example`
-- the committed demo patient dataset in `data/patients`
-- the initial Next.js application scaffold in `src/app`
-- the root app config in `package.json`, `tsconfig.json`, `next.config.ts`, and `eslint.config.mjs`
-- the remaining phase docs in `docs/`
+Current assumptions:
+- live FHIR access is driven by a short-lived patient token copied from `app.healthex.io`
+- the JWT `sub` works as the HealthEx `Person` ID for `GET /FHIR/R4/Person/{id}/$everything`
+- the browser can successfully fetch the patient's bundle directly, while the
+  same copied token currently returns `403` from terminal or server-side requests
+- the app therefore treats browser-side live fetch as the primary retrieval path
+- a locally saved bundle under `tmp/healthex-fhir/` is an optional development fallback
+
+Historical note:
+- this repository initially explored a Synthea-based demo-data workflow, but it
+  has fully pivoted to the personal-record HealthEx workflow above
 
 ## Repo Guide
 
 - `README.md`: evaluator-facing overview
 - `IMPLEMENTATION_PLAN.md`: living technical source of truth, decisions, and TODOs
 - `AGENT_README.md`: operating rules for agents working in this directory
-- `package.json`: app scripts and JavaScript dependencies
-- `data/patients`: committed synthetic FHIR bundles for the interactive demo set
+- `HealthEx_TSE_Exercise.md`: original assignment brief
 - `src/app`: Next.js App Router entrypoint for the web UI
-- `docs/phase1_foundation.md`: Phase 1 foundation decisions and setup notes
-- `docs/phase2_fhir_queries_shaping.md`: Phase 2 API investigation and FHIR shaping handoff
-- `docs/phase3_clinical_history_ui.md`: blank placeholder for Phase 3 work
-- `docs/phase4_immunization_engine.md`: blank placeholder for Phase 4 work
-- `docs/phase5_claude_skill.md`: blank placeholder for Phase 5 work
-- `docs/phase6_extensions_validation.md`: blank placeholder for Phase 6 work
-- `docs/phase7_readme_submission.md`: blank placeholder for Phase 7 work
-- `HealthEx_TSE_Exercise.txt`: original exercise brief
+- `src/components/live-healthex-viewer.tsx`: browser-side live FHIR fetch flow
+- `src/lib/healthex-summary.ts`: shared FHIR bundle-to-summary shaping logic
+- `src/lib/local-healthex-bundle.ts`: local snapshot fallback loader
+- `scripts/pull-healthex-record.mjs`: helper script for longer-lived or future server-usable HealthEx credentials
+- `docs/phase1_foundation.md`: Phase 1 HealthEx access and retrieval foundation
+- `docs/phase2_fhir_queries_shaping.md`: Phase 2 shaping and summary-section handoff
+- `docs/phase3_clinical_history_ui.md`: Phase 3 UI execution notes
+- `docs/phase4_immunization_engine.md`: Phase 4 immunization analysis notes
+- `docs/phase5_claude_skill.md`: Phase 5 Claude/MCP integration notes
+- `docs/phase6_extensions_validation.md`: Phase 6 validation and polish notes
+- `docs/phase7_readme_submission.md`: Phase 7 evaluator-facing documentation notes
 
 ## Setup And Run
-
-The repository now includes a runnable Next.js scaffold and a shared local environment contract.
 
 ### Quick Start
 
@@ -55,74 +58,74 @@ npm install
 npm run dev
 ```
 
-Use this as the default bootstrap flow for the repo.
+### Local Setup
 
-Additional local setup:
 1. Run `cp .env.example .env`.
-2. Fill in `.env` as the HealthEx integration details are confirmed.
-3. Start from the `src/app` scaffold and layer in FHIR retrieval and UI sections incrementally.
+2. Fill in `.env` only if you are testing a scripted HealthEx pull with a
+   reusable token or explicit `Person` ID override.
+3. Start the app with `npm run dev`.
+4. Open `http://localhost:3000`.
+5. Paste a current HealthEx patient token into the live viewer and let the app
+   derive the `Person` ID from the JWT `sub`.
 
-Current setup files:
-- `environment.yml`: shared Conda environment with Python and Node.js
-- `.env.example`: starter environment variables for FHIR access and patient selection
-- `.gitignore`: protection for local env files and future build artifacts
-- `data/patients`: committed reviewer-friendly synthetic patient dataset and manifest
-- `src/app/page.tsx`: minimal landing page and Phase 1 placeholder UI
+## Current Retrieval Flow
 
-### Synthea Workflow Notes
+The app supports two ways of working:
 
-Phase 1 uses Synthea as the primary synthetic-patient source.
+### 1. Primary path: live browser fetch
 
-Recommended local flow:
-1. Use the shared Conda environment, which now includes Java for Synthea.
-2. Download `synthea-with-dependencies.jar` or clone the Synthea repo outside this repository.
-3. Generate a small exploratory batch into `tmp/synthea-output/`.
-4. Inspect the exported FHIR bundles and shortlist about 5 strong candidates.
+This is the current supported flow for development and demo work.
 
-Example command:
+1. Sign in to `app.healthex.io`.
+2. Open DevTools and read `container.authManager.token`.
+3. Paste the token into the app's live fetch form.
+4. The app decodes `sub`, calls `GET /FHIR/R4/Person/{sub}/$everything`, follows
+   pagination, and renders the supported FHIR sections.
 
-```bash
-java -jar synthea-with-dependencies.jar \
-  -p 10 \
-  -s 21 \
-  --exporter.fhir.export=true \
-  --exporter.baseDirectory="/absolute/path/to/HealthEx_TSE_Exercise/tmp/synthea-output"
-```
+Important limitation:
+- this copied patient token expires quickly and should be treated as a temporary
+  developer credential, not a durable integration token
 
-See `docs/phase1_foundation.md` for the full curation workflow and selection criteria.
+### 2. Optional local snapshot fallback
 
-Current guidance from initial runs:
-- use `-p 10` for fast exploration
-- use `-a 18-65` when we want adult immunization-demo candidates
-- treat the Synthea seed as a reproducible batch identifier, not the primary quality lever
+If a bundle has already been saved under `tmp/healthex-fhir/`, the app can read
+the latest snapshot and render it as a fallback.
 
-Phase 1 also produced a committed 10-patient demo-ready Synthea set in `data/patients` plus a recommended primary patient and backups. The exact shortlist and tuned generation notes live in `docs/phase1_foundation.md`.
+This is useful when:
+- you want to iterate on the UI without re-fetching immediately
+- you want a stable local sample during short-lived token windows
 
-## Current Technical Direction
+## Technical Notes
 
-- Keep the implementation simple, readable, and demo-friendly.
-- Use the repository plan as the shared source of truth while the build takes shape.
-- Use Phase 1 to generate about 5 curated synthetic patients with Synthea for the downstream demo.
-- Use `Next.js + TypeScript` for the application and Conda to standardize local setup.
-- Keep the current UI shell minimal until the FHIR data-shaping work is ready.
-- Keep Phase 2 API investigation and the first HealthEx integration pass with the same agent when possible for continuity.
-- Keep phase docs reserved for phased execution and handoff notes as they are defined.
+- FHIR base URL: `https://api.healthex.io/FHIR/R4`
+- Primary query pattern: `GET /Person/{personId}/$everything`
+- Current app strategy: browser-side fetch plus shared client/server shaping logic
+- Current summary behavior: automatically ranks up to two supported lead sections from the active bundle and flags document-heavy snapshots
+- Current token limitation: copied patient tokens work in the browser runtime but
+  currently return `403` from terminal and server-side requests in this repo
 
 ## Tradeoffs So Far
 
-The main tradeoff so far is prioritizing clear planning and shared repository memory before implementation. That slows down coding slightly at the start, but it should make the eventual build cleaner, easier to hand off between agents, and easier for a reviewer to understand.
+- The live browser-token flow is fast to validate and aligns with what is
+  already working today, but it is not the long-term auth architecture we would
+  want for a production integration.
+- Keeping a local bundle fallback improves iteration speed, but it can lag
+  behind the live record if it is not refreshed.
+- The latest saved local snapshot is still mostly `Binary` data, so it currently
+  validates `AllergyIntolerance` as the only clearly usable structured lead section.
 
 ## With More Time
 
-Once implementation begins, this README should be expanded with:
-- actual setup and run commands
-- architecture notes tied to the final stack
-- screenshots or a short walkthrough of the UI
-- a concise summary of final technical tradeoffs
+- replace the temporary copied-token flow with a more durable HealthEx auth path
+- refresh the saved bundle from a fuller live browser pull so a second supported
+  lead section can be validated locally
+- clarify the best route for immunization data if it is not reliably exposed in
+  the current FHIR response
+- finish the Claude skill and recommendation workflow with the final data shape
 
 ## Additional Documentation
 
 - See `IMPLEMENTATION_PLAN.md` for the living backlog and decision log.
 - See `AGENT_README.md` for repository-specific agent rules.
-- See `docs/phase1_foundation.md` for the current setup and environment assumptions.
-- See `docs/phase2_fhir_queries_shaping.md` for the active HealthEx API and shaping handoff.
+- See `docs/phase1_foundation.md` for the completed access and setup foundation.
+- See `docs/phase2_fhir_queries_shaping.md` for the active shaping handoff.

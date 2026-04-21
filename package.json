@@ -7,7 +7,8 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "eslint ."
+    "lint": "eslint .",
+    "pull:healthex": "node --env-file=.env scripts/pull-healthex-record.mjs"
   },
   "dependencies": {
     "next": "^16.2.4",

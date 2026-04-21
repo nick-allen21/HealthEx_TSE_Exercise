@@ -1,6 +1,9 @@
 # HealthEx Technical Implementation Plan
 
-This document is the living technical source of truth for the HealthEx exercise repository. Agents should update it as decisions are made, TODOs move forward, and scope changes.
+This document is the living technical source of truth for the technical portion
+of the HealthEx exercise. It should reflect the current implementation path, the
+current patient-source strategy, and the assumptions future agents need in order
+to continue without rediscovering context.
 
 ## Current Scope
 
@@ -8,8 +11,8 @@ This plan covers the technical component of the exercise only.
 
 Out of scope for now:
 - Part 2 written deliverables
-- detailed phase build plans
-- presentation prep details beyond technical demo readiness
+- presentation prep beyond technical demo readiness
+- speculative infrastructure that does not help the current demo path
 
 ## Assignment Summary
 
@@ -19,18 +22,30 @@ The technical assignment requires us to:
 - display at least two allowed FHIR resource types in structured form
 - build a Claude skill that uses the HealthEx MCP server
 - detect immunization gaps across the patient's history
-- compare those gaps against an accredited recommendation source
+- compare immunization history against an accredited recommendation source
 - propose a corrective schedule of actions
 
-Primary source: `HealthEx_TSE_Exercise.txt`
+Primary source: `HealthEx_TSE_Exercise.md`
+
+## Patient Source Strategy
+
+The repo has fully pivoted to a single active patient-source strategy:
+- use the repository owner's own HealthEx record
+- authenticate through the short-lived patient token exposed in the browser session
+- derive the `Person` ID from the JWT `sub`
+- fetch the FHIR bundle from `GET /FHIR/R4/Person/{personId}/$everything`
+
+Historical note:
+- the repo initially explored a Synthea-based workflow, but that path is no
+  longer active guidance and should not drive implementation decisions
 
 ## Requirements Checklist
 
 ### Must-haves
 
-- [ ] Fetch a patient record from the HealthEx FHIR server
-- [ ] Choose and document the patient source strategy
-- [ ] Retrieve at least two allowed FHIR resource types
+- [x] Fetch a patient record from the HealthEx FHIR server
+- [x] Choose and document the patient source strategy
+- [ ] Retrieve at least two allowed FHIR resource types in a stable way
 - [ ] Transform the data into a readable health summary
 - [ ] Avoid showing raw JSON as the main user experience
 - [ ] Build a working Web UI for the clinical history view
@@ -43,11 +58,28 @@ Primary source: `HealthEx_TSE_Exercise.txt`
 
 ### Committed extension goals
 
-We intend to complete the stretch items from the exercise brief, even though they are listed as optional there.
+We still intend to complete the stretch items from the brief if they materially
+improve the submission.
 
 - [ ] Surface at least one data quality or completeness issue and explain how it should be handled in production
 - [ ] Add a focused unit test or two for the most critical logic
 - [ ] Add at least one creative AI skill extension or experiment that materially improves the demo
+
+## Validated Findings
+
+These are no longer assumptions; they have already been validated in the current
+implementation work.
+
+- The HealthEx FHIR base URL is `https://api.healthex.io/FHIR/R4/`.
+- The HealthEx patient browser token can be read from `container.authManager.token`
+  inside `app.healthex.io`.
+- The JWT `sub` works as the `Person` ID for `GET /FHIR/R4/Person/{sub}/$everything`.
+- Browser-side requests using the live patient token succeed for the FHIR `$everything` call.
+- The same copied patient token currently returns `403` from terminal and
+  server-side requests in this repository.
+- The app therefore uses browser-side live fetch as the primary retrieval path.
+- The repo also supports a local snapshot fallback from `tmp/healthex-fhir/`
+  when a bundle has already been saved.
 
 ## Planned Technical Deliverables
 
@@ -57,27 +89,19 @@ We intend to complete the stretch items from the exercise brief, even though the
 - A Claude skill prompt and usage pattern for immunization-gap analysis
 - A documented recommendation source and comparison approach
 - A concise evaluator-facing `README.md`
-- Seven phase docs in `docs/` for workstream-specific execution and handoff notes
+- Seven phase docs in `docs/` for execution notes and handoff context
 
 ## Phase Document Status
 
 Current phase-doc status:
 
-- `docs/phase1_foundation.md`: complete and closed out
-- `docs/phase2_fhir_queries_shaping.md`: active handoff for HealthEx API investigation and shaping
-- `docs/phase3_clinical_history_ui.md`
-- `docs/phase4_immunization_engine.md`
-- `docs/phase5_claude_skill.md`
-- `docs/phase6_extensions_validation.md`
-- `docs/phase7_readme_submission.md`
-
-## Document Rules
-
-- Update this file whenever scope, assumptions, or status changes.
-- Add resolved decisions to the decision log instead of leaving them implicit.
-- Keep TODOs actionable and grouped by workstream.
-- Keep the phase docs aligned with this file as they are defined and expanded.
-- Do not treat this document as a detailed phase log; detailed execution notes belong in the assigned phase doc.
+- `docs/phase1_foundation.md`: rewritten to cover HealthEx access and retrieval foundation
+- `docs/phase2_fhir_queries_shaping.md`: active shaping and summary-section handoff
+- `docs/phase3_clinical_history_ui.md`: reserved for focused UI work
+- `docs/phase4_immunization_engine.md`: reserved for immunization-gap analysis work
+- `docs/phase5_claude_skill.md`: reserved for Claude and MCP work
+- `docs/phase6_extensions_validation.md`: reserved for validation and polish
+- `docs/phase7_readme_submission.md`: reserved for evaluator-facing packaging
 
 ## Architecture Assumptions And Constraints
 
@@ -85,12 +109,12 @@ Current phase-doc status:
 
 - The demo should optimize for clarity over breadth.
 - The UI should feel clean and easy to evaluate quickly.
-- The assignment is time-boxed, so we should prefer simple architecture over maximum completeness.
-- The solution must clearly demonstrate both FHIR handling and AI-assisted reasoning.
+- The assignment is time-boxed, so simple implementation paths should win.
+- The solution must still clearly demonstrate both FHIR handling and AI-assisted reasoning.
 
 ### Data constraints
 
-- Data must come from `https://api.healthex.io/FHIR/R4/`
+- Data must come from `https://api.healthex.io/FHIR/R4/`.
 - The displayed summary must use at least two of these resource types:
   - `Observation`
   - `MedicationRequest`
@@ -104,7 +128,7 @@ Current phase-doc status:
 
 - The repo should remain understandable to a reviewer opening it for the first time.
 - The plan should stay lightweight enough that agents can actually keep it updated.
-- The implementation should favor fast demo readiness over speculative infrastructure.
+- Each tracked file should have a clear purpose in the current personal-record workflow.
 
 ## Decision Log
 
@@ -114,98 +138,77 @@ Current phase-doc status:
 |---|---|---|
 | Repository source of truth | `IMPLEMENTATION_PLAN.md` is the living technical source of truth | Keeps project memory in one place |
 | Human entry point | `README.md` is evaluator-facing | Matches the exercise submission context |
-| Phase docs | We will maintain seven named phase docs in `docs/`, one for each implementation workstream | Gives each agent a clear execution and handoff surface |
-| Planning model | TODOs are grouped by workstream now, phase build plans later | Lets phase agents derive their own execution plans |
-| Agent operating model | Each agent owns one phase and updates shared docs as work progresses | Preserves accountability and continuity |
-| Technical stack | Next.js + TypeScript is the main application stack | Aligns with HealthEx's TypeScript usage while keeping the app simple |
-| Python role | Python is limited to helper scripts and data tooling | Lets us use Python where convenient without turning the project into a multi-runtime app |
-| Local bootstrap flow | Agents should standardize on the Conda + npm startup sequence documented in `README.md` and `docs/phase1_foundation.md` | Keeps environment setup predictable across agents and machines |
-| Initial scaffold shape | The app starts as a minimal Next.js App Router scaffold rooted at `src/app` | Gives Phase 2 a clean place to add FHIR retrieval and summary UI work |
-| Local Synthea placement | Keep Synthea as an external local tool for now and document the runbook rather than vendoring the generator into this repo | Keeps the repo lightweight while Phase 1 focuses on workflow clarity |
-| Synthea runtime dependency | The shared Conda environment should include OpenJDK so Synthea runs without extra machine-specific setup | Keeps the synthetic-data workflow reproducible for future agents |
-| Demo patient packaging | Commit the curated synthetic demo set in `data/patients` so reviewers can run the app without generating data first | Improves reviewer reproducibility while keeping exploratory generation output out of the repo |
-| Patient strategy | Phase 1 will generate about 5 curated synthetic patients using the Synthea JAR | Gives us realistic structured FHIR data while letting us optimize the demo data we want to show |
-| Phase continuity | When API investigation is part of the work, the same agent should carry the first implementation pass when possible | Reduces context loss between discovery and execution |
-| Stretch work | We plan to complete all three stretch items from the brief | The extra validation and AI work improves the strength of the submission |
+| Phase docs | We will maintain seven phase docs in `docs/` as the handoff surface for future work | Keeps multi-agent context explicit |
+| Technical stack | Next.js + TypeScript is the main application stack | Aligns with HealthEx's TypeScript usage and keeps the app simple |
+| Python role | Python is limited to helper tooling and diagnostics | Keeps the shipped app single-runtime |
+| Bootstrap flow | Use the Conda + npm startup sequence documented in `README.md` | Keeps setup predictable in Cursor and local terminals |
+| Patient source | Use the repository owner's own HealthEx record only | Removes confusion from synthetic datasets and matches the current validated path |
+| Primary retrieval path | Use browser-side `GET /FHIR/R4/Person/{sub}/$everything` with the live patient token | This is the path that has actually been validated end-to-end |
+| Local fallback | Keep `tmp/healthex-fhir/` as an optional local snapshot fallback | Helps UI development when a recent bundle already exists |
+| Summary shaping | Use shared bundle-to-summary logic for both local and live flows | Keeps the UI behavior consistent |
 
 ### Open Decisions
 
 | Topic | Current options | Notes |
 |---|---|---|
-| UI information architecture | Single-page summary, tabbed view, or sectioned dashboard | Must stay simple and reviewer-friendly |
-| FHIR normalization approach | Client-side transform only, or lightweight server-side shaping | Prefer the simplest path that keeps the UI clean |
-| Immunization schedule source | CDC adult schedule or another accredited equivalent | Must be clearly cited and easy to justify |
-| Claude skill packaging | Prompt set, workflow notes, and repo documentation | Need to decide the exact deliverable shape |
+| Token automation | Keep manual paste flow for now, or add a browser-side developer bridge later | Manual paste works today; auth automation can wait |
+| First emphasized resource types | Lead with whatever two resource types are best populated in the real record | Must satisfy the assignment while staying readable |
+| Immunization source quality | Use direct FHIR `Immunization` if available, or document limitations if it remains sparse | Needs validation against the real patient bundle |
+| Claude skill packaging | Prompt set, workflow notes, and repo documentation | Final deliverable shape still needs to be chosen |
 
 ## Proposed Technical Direction
-
-These reflect the current technical direction. Some items below are now locked, while others remain open decisions.
 
 ### Web application
 
 - Favor a lightweight web app with a minimal number of moving parts.
 - Use Next.js + TypeScript for the shipped application.
 - Structure the UI around readable clinical sections rather than raw resource dumps.
-- Include immunizations in the visible history even if they are also used by the Claude skill.
+- Keep the browser-side live fetch path available so the app can hydrate from a current patient token.
 
 ### Data handling
 
-- Fetch the patient and relevant related resources from the HealthEx FHIR endpoint.
-- Generate about 5 synthetic patients with the Synthea JAR in Phase 1 so we have realistic data we can tune for the demo.
-- Commit the curated reviewer-facing patient set in `data/patients` rather than serving raw bundles from `public/`.
-- Prefer adult age filtering during exploration when the goal is to support immunization-gap analysis.
-- Use Python only for support tooling if it materially helps with patient-data generation or analysis.
-- Normalize the returned data into UI-ready sections.
+- Treat the HealthEx `Person` ID as the primary FHIR retrieval handle.
+- Use browser-side fetch for the current patient-token path because it is the validated path that works.
+- Keep `tmp/healthex-fhir/` as an optional local bundle source for development fallback.
+- Normalize the returned bundle into UI-ready sections with shared shaping logic.
 - Prefer a narrow, explicit set of supported resource types for the initial build.
 
 ### AI component
 
 - Use the HealthEx MCP server through Claude for immunization-gap analysis.
 - Make the skill's inputs, assumptions, and recommendation source explicit.
-- Keep the analysis grounded in structured patient immunization history rather than vague summaries.
+- Keep the analysis grounded in structured patient history when possible.
+- Document auth limitations clearly if MCP and FHIR continue to require different working flows.
 
 ## Master TODOs
 
-These TODOs are the working backlog for future phase agents.
+### 1. Access and retrieval foundation
 
-### 1. Project setup and scaffolding
-
-- [x] Choose the implementation stack and record the decision here
-- [x] Set up the initial project structure
-- [x] Define environment variables and local setup requirements
-- [x] Document the default Conda + npm bootstrap flow for future agents
-- [x] Document the local Synthea workflow and output location
-- [x] Decide to keep Synthea external to the repo for now
-- [x] Close out Phase 1 and hand off HealthEx API investigation to Phase 2
-- [x] Establish a simple folder structure for app code, docs, and prompts if needed
+- [x] Lock the implementation stack and bootstrap flow
+- [x] Validate the browser-side patient-token path
+- [x] Confirm that JWT `sub` works as the HealthEx `Person` ID
+- [x] Add a live browser-side retrieval flow to the app
+- [ ] Decide whether a token-automation bridge is needed for the demo
 
 ### 2. FHIR retrieval and shaping
 
-- [x] Generate and shortlist a demo-ready synthetic patient set with tuned Synthea settings
-- [ ] Confirm how the HealthEx FHIR tooling will be accessed during development
-- [ ] Confirm how the HealthEx MCP tooling will be accessed during development
-- [ ] Confirm how the selected synthetic patient data will flow through the HealthEx FHIR server requirements
-- [ ] Document the exact FHIR queries needed for the chosen patient
-- [ ] Select the initial resource types to support in the UI
-- [ ] Build data-fetching logic for patient and related resources
-- [ ] Build a transformation layer that shapes FHIR responses into readable summary data
-- [ ] Document any data quality or completeness issues found in the returned record
+- [ ] Identify the strongest supported resource types in the real patient bundle
+- [ ] Build shaping logic that emphasizes at least two required FHIR resource types
+- [ ] Improve handling for document-heavy or partially normalized bundle responses
+- [ ] Document any data quality or completeness issues found in the live record
 
 ### 3. Clinical history Web UI
 
-- [ ] Define the reviewer-facing UI layout
-- [ ] Implement the patient summary view
-- [ ] Implement readable sections for at least two required resource types
-- [ ] Add immunization history to the UI if it is not already one of the two primary displayed resource types
-- [ ] Handle empty, partial, or missing clinical data gracefully
-- [ ] Keep language and labels non-technical where possible
+- [ ] Tighten the reviewer-facing UI layout
+- [ ] Implement readable sections for the strongest supported resource types
+- [ ] Keep empty and partial states graceful and non-technical
+- [ ] Decide how prominently to surface local snapshot fallback versus live fetch
 
 ### 4. Immunization-gap analysis design
 
 - [ ] Choose the accredited immunization recommendation source
-- [ ] Document the comparison rules we will use
-- [ ] Define how age, history, timing, and missing data should affect recommendations
-- [ ] Identify what output shape the analysis should produce
+- [ ] Validate whether FHIR `Immunization` is complete enough in the real record
+- [ ] Define the comparison rules we will use
 - [ ] Document limitations and non-clinical disclaimers needed for the demo
 
 ### 5. Claude skill and MCP integration
@@ -213,19 +216,14 @@ These TODOs are the working backlog for future phase agents.
 - [ ] Confirm the exact HealthEx MCP workflow required for Claude
 - [ ] Draft the Claude skill instructions
 - [ ] Define what context the skill needs as input
-- [ ] Implement or document the skill usage flow end-to-end
 - [ ] Validate that the skill can identify gaps and produce a corrective schedule
-- [ ] Capture any manual steps needed for reviewers or demo walkthroughs
 
-### 6. Validation, extension tasks, and demo polish
+### 6. Validation and polish
 
 - [ ] Identify the most critical logic worth testing
-- [ ] Add a small number of focused tests if they reduce real risk
-- [ ] Surface at least one data quality or completeness issue and document the production handling approach
-- [ ] Add at least one creative AI extension or experiment that materially improves the demo
-- [ ] Verify the main technical flow end-to-end
-- [ ] Confirm the UI is readable with realistic patient data
-- [ ] Prepare a concise demo narrative for the technical walkthrough
+- [ ] Add focused tests only where they materially reduce risk
+- [ ] Verify the main technical flow end-to-end with the live browser-token path
+- [ ] Confirm the UI is readable with real patient data
 
 ### 7. Evaluator-facing documentation
 
@@ -233,19 +231,18 @@ These TODOs are the working backlog for future phase agents.
 - [ ] Document setup and run instructions
 - [ ] Document key tradeoffs
 - [ ] Document what we would do differently with more time
-- [ ] Link reviewers to deeper technical docs only where useful
 
 ## Risks And Unknowns
 
-- We may discover gaps or inconsistencies in patient immunization history.
-- The HealthEx MCP workflow may require setup details not yet documented in this repo.
-- The best patient source for the demo may depend on data completeness rather than convenience.
+- Copied browser patient tokens are short-lived and inconvenient for repeated manual testing.
+- The patient token currently appears to be browser-usable but server-side-forbidden in this repo.
+- Some clinically interesting data may arrive as `Binary` or other document-heavy resources rather than clean structured FHIR resources.
 - Immunization recommendations can become complex quickly, so we should avoid over-claiming clinical certainty.
-- If the technical stack is changed later, this plan will need a decision update before implementation starts.
+- The HealthEx MCP workflow may still require setup details not yet documented in this repo.
 
 ## Handoff Notes For Future Phase Agents
 
-- Start by reading this file, `AGENT_README.md`, and your assigned phase document.
-- Treat the checklist and TODOs above as the current shared backlog.
-- Record new decisions here before making large architecture changes.
-- Map your phase work back to the TODOs in this file rather than replacing them.
+- Start by reading this file, `AGENT_README.md`, and the phase document you are responsible for.
+- Assume the active patient strategy is the repository owner's own HealthEx record unless a user explicitly changes it.
+- Do not revive Synthea or synthetic-demo guidance unless the user explicitly asks for that path again.
+- Prefer updating the current browser-live workflow before adding new infrastructure.
