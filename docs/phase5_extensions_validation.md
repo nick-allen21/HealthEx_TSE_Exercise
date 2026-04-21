@@ -1,8 +1,8 @@
-## Phase 6 Extensions And Validation
+## Phase 5 Extensions And Validation
 
 ## Purpose
 
-Phase 6 covers validation, focused testing, and any stretch work that materially
+Phase 5 covers validation, focused testing, and any stretch work that materially
 improves the technical submission.
 
 ## Focus Areas

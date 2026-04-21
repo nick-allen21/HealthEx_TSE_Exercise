@@ -1,8 +1,8 @@
-## Phase 7 README And Submission
+## Phase 6 README And Submission
 
 ## Purpose
 
-Phase 7 turns the technical work into a reviewer-friendly submission package.
+Phase 6 turns the technical work into a reviewer-friendly submission package.
 
 ## Deliverables
 

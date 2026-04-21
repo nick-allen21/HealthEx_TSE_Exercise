@@ -45,10 +45,10 @@ Historical note:
 
 - [x] Fetch a patient record from the HealthEx FHIR server
 - [x] Choose and document the patient source strategy
-- [ ] Retrieve at least two allowed FHIR resource types in a stable way
-- [ ] Transform the data into a readable health summary
-- [ ] Avoid showing raw JSON as the main user experience
-- [ ] Build a working Web UI for the clinical history view
+- [x] Retrieve at least two allowed FHIR resource types in a stable way
+- [x] Transform the data into a readable health summary
+- [x] Avoid showing raw JSON as the main user experience
+- [x] Build a working Web UI for the clinical history view
 - [ ] Build a Claude skill that uses the HealthEx MCP server
 - [ ] Evaluate immunization history across all time
 - [ ] Compare immunization history against an accredited schedule source
@@ -86,10 +86,10 @@ implementation work.
 - A technical implementation in this repository
 - A Web UI that presents a patient health summary in a simple reviewer-friendly layout
 - A clear data flow from HealthEx FHIR data into normalized UI sections
-- A Claude skill prompt and usage pattern for immunization-gap analysis
+- An uploadable Claude skill package and usage pattern for immunization-gap analysis
 - A documented recommendation source and comparison approach
 - A concise evaluator-facing `README.md`
-- Seven phase docs in `docs/` for execution notes and handoff context
+- Six phase docs in `docs/` for execution notes and handoff context
 
 ## Phase Document Status
 
@@ -97,11 +97,10 @@ Current phase-doc status:
 
 - `docs/phase1_foundation.md`: rewritten to cover HealthEx access and retrieval foundation
 - `docs/phase2_fhir_queries_shaping.md`: active shaping and summary-section handoff
-- `docs/phase3_clinical_history_ui.md`: reserved for focused UI work
-- `docs/phase4_immunization_engine.md`: reserved for immunization-gap analysis work
-- `docs/phase5_claude_skill.md`: reserved for Claude and MCP work
-- `docs/phase6_extensions_validation.md`: reserved for validation and polish
-- `docs/phase7_readme_submission.md`: reserved for evaluator-facing packaging
+- `docs/phase3_clinical_history_ui.md`: completed reviewer-facing chart shell, fallback decisions, grouped-summary presentation, streaming summary direction, final compact single-column review cleanup, per-section search / in-card expansion pass, the flat-tab restructure that drops Documents and Allergies, exposes a per-tab search input, and adds inline item-level sparkline / date-timeline expansion, and the chart polish + classification pass (non-clipping y-axis with a single unit caption, no value list under a chart, category-first vital/lab classification, UCUM unit prettifier, stronger narrative filter, immunization dose grouping, same-day medication dedupe, and an MCP-injection-safe `suppressHydrationWarning` on the root layout), plus a live-data verification pass and an immunization display-label tie-break that prefers a non-numeric variant when one is available
+- `docs/phase4_claude_immunization_skill.md`: active skill-package, recommendation-source, and Claude/MCP workflow handoff
+- `docs/phase5_extensions_validation.md`: reserved for validation and polish
+- `docs/phase6_readme_submission.md`: reserved for evaluator-facing packaging
 
 ## Architecture Assumptions And Constraints
 
@@ -138,7 +137,7 @@ Current phase-doc status:
 |---|---|---|
 | Repository source of truth | `IMPLEMENTATION_PLAN.md` is the living technical source of truth | Keeps project memory in one place |
 | Human entry point | `README.md` is evaluator-facing | Matches the exercise submission context |
-| Phase docs | We will maintain seven phase docs in `docs/` as the handoff surface for future work | Keeps multi-agent context explicit |
+| Phase docs | We will maintain six phase docs in `docs/` as the handoff surface for future work | Keeps multi-agent context explicit |
 | Technical stack | Next.js + TypeScript is the main application stack | Aligns with HealthEx's TypeScript usage and keeps the app simple |
 | Python role | Python is limited to helper tooling and diagnostics | Keeps the shipped app single-runtime |
 | Bootstrap flow | Use the Conda + npm startup sequence documented in `README.md` | Keeps setup predictable in Cursor and local terminals |
@@ -146,6 +145,9 @@ Current phase-doc status:
 | Primary retrieval path | Use browser-side `GET /FHIR/R4/Person/{sub}/$everything` with the live patient token | This is the path that has actually been validated end-to-end |
 | Local fallback | Keep `tmp/healthex-fhir/` as an optional local snapshot fallback | Helps UI development when a recent bundle already exists |
 | Summary shaping | Use shared bundle-to-summary logic for both local and live flows | Keeps the UI behavior consistent |
+| Recommendation source | Use `CDC/ACIP` as the clinical source of truth and `CDC CDSi` as the implementation companion | Matches the assignment and keeps the authority hierarchy explicit |
+| Claude skill packaging | Ship a real uploadable skill folder under `claude-skills/healthex-immunization-gap/` | Gives reviewers a concrete artifact they can inspect and upload |
+| Skill input contract | Expect live HealthEx connector access and ask the user to connect HealthEx if tool access is unavailable | Keeps the skill grounded in record evidence rather than guesswork |
 
 ### Open Decisions
 
@@ -154,7 +156,7 @@ Current phase-doc status:
 | Token automation | Keep manual paste flow for now, or add a browser-side developer bridge later | Manual paste works today; auth automation can wait |
 | First emphasized resource types | Lead with whatever two resource types are best populated in the real record | Must satisfy the assignment while staying readable |
 | Immunization source quality | Use direct FHIR `Immunization` if available, or document limitations if it remains sparse | Needs validation against the real patient bundle |
-| Claude skill packaging | Prompt set, workflow notes, and repo documentation | Final deliverable shape still needs to be chosen |
+| Exact HealthEx MCP flow inside Claude | Confirm the precise connector/tool sequence needed to access the current patient record | The shipped skill assumes connector access, but live tool flow still needs end-to-end validation |
 
 ## Proposed Technical Direction
 
@@ -163,6 +165,13 @@ Current phase-doc status:
 - Favor a lightweight web app with a minimal number of moving parts.
 - Use Next.js + TypeScript for the shipped application.
 - Structure the UI around readable clinical sections rather than raw resource dumps.
+- Prefer grouped summaries for high-volume sections instead of rendering every resource as a first-class row.
+- Use a chart-style shell with a short AI summary and tabbed domains for dense patient histories.
+- Keep the review surface compact and calm: summary directly above review, low-chrome tabs, and flat per-tab item lists instead of oversized hero framing.
+- Let the active tab carry the domain context so repeated domain headers and nested card framing can be dropped.
+- Place one search input at the top of each tab and scope it to the items in that tab.
+- Expand individual items inline (not sections) to reveal their own history — a numeric sparkline with min/max/average for vitals and labs, and a date timeline for event-style domains.
+- Collapse the source/fetch controls into a minimal top bar that can be expanded on demand so the reviewer view stays the focus.
 - Keep the browser-side live fetch path available so the app can hydrate from a current patient token.
 
 ### Data handling
@@ -179,6 +188,7 @@ Current phase-doc status:
 - Make the skill's inputs, assumptions, and recommendation source explicit.
 - Keep the analysis grounded in structured patient history when possible.
 - Document auth limitations clearly if MCP and FHIR continue to require different working flows.
+- Keep the uploadable skill package in `claude-skills/healthex-immunization-gap/`.
 
 ## Master TODOs
 
@@ -199,33 +209,30 @@ Current phase-doc status:
 
 ### 3. Clinical history Web UI
 
-- [ ] Tighten the reviewer-facing UI layout
-- [ ] Implement readable sections for the strongest supported resource types
-- [ ] Keep empty and partial states graceful and non-technical
-- [ ] Decide how prominently to surface local snapshot fallback versus live fetch
+- [x] Tighten the reviewer-facing UI layout
+- [x] Implement readable sections for the strongest supported resource types
+- [x] Keep empty and partial states graceful and non-technical
+- [x] Decide how prominently to surface local snapshot fallback versus live fetch
 
-### 4. Immunization-gap analysis design
+### 4. Claude immunization skill
 
-- [ ] Choose the accredited immunization recommendation source
+- [x] Choose the accredited immunization recommendation source
 - [ ] Validate whether FHIR `Immunization` is complete enough in the real record
 - [ ] Define the comparison rules we will use
-- [ ] Document limitations and non-clinical disclaimers needed for the demo
-
-### 5. Claude skill and MCP integration
-
+- [x] Document limitations and non-clinical disclaimers needed for the demo
 - [ ] Confirm the exact HealthEx MCP workflow required for Claude
-- [ ] Draft the Claude skill instructions
-- [ ] Define what context the skill needs as input
+- [x] Draft the Claude skill instructions
+- [x] Define what context the skill needs as input
 - [ ] Validate that the skill can identify gaps and produce a corrective schedule
 
-### 6. Validation and polish
+### 5. Validation and polish
 
 - [ ] Identify the most critical logic worth testing
 - [ ] Add focused tests only where they materially reduce risk
 - [ ] Verify the main technical flow end-to-end with the live browser-token path
 - [ ] Confirm the UI is readable with real patient data
 
-### 7. Evaluator-facing documentation
+### 6. Evaluator-facing documentation
 
 - [ ] Keep `README.md` current as the implementation changes
 - [ ] Document setup and run instructions
@@ -239,6 +246,7 @@ Current phase-doc status:
 - Some clinically interesting data may arrive as `Binary` or other document-heavy resources rather than clean structured FHIR resources.
 - Immunization recommendations can become complex quickly, so we should avoid over-claiming clinical certainty.
 - The HealthEx MCP workflow may still require setup details not yet documented in this repo.
+- The uploaded skill and the local browser-token FHIR path rely on related but not identical access patterns, so reviewer instructions must keep that distinction clear.
 
 ## Handoff Notes For Future Phase Agents
 

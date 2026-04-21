@@ -2,12 +2,17 @@
 
 import { useMemo, useState } from "react";
 
+import { StreamingChartSummary } from "@/components/streaming-chart-summary";
 import {
   buildSummaryFromBundle,
   decodeJwtSub,
+  prettifyUnit,
+  type ClinicalItem,
+  type ClinicalOccurrence,
+  type ClinicalTab,
+  type ClinicalTabId,
   type FhirBundle,
   type HealthExSummary,
-  SUPPORTED_TYPE_LABELS,
 } from "@/lib/healthex-summary";
 
 type LiveHealthExViewerProps = {
@@ -19,12 +24,6 @@ type FetchState =
   | { status: "loading" }
   | { message: string; status: "error" }
   | { status: "success"; summary: HealthExSummary };
-
-const sectionStatusLabels = {
-  lead: "Lead section",
-  available: "Supporting section",
-  empty: "Awaiting data",
-} as const;
 
 async function fetchAllPages(personId: string, token: string) {
   const entries: NonNullable<FhirBundle["entry"]> = [];
@@ -80,15 +79,423 @@ async function fetchAllPages(personId: string, token: string) {
   };
 }
 
+function normalizeSearchValue(value: string) {
+  return value.trim().toLowerCase();
+}
+
+function filterClinicalItems(items: ClinicalItem[], query: string) {
+  const normalizedQuery = normalizeSearchValue(query);
+
+  if (!normalizedQuery) {
+    return items;
+  }
+
+  return items.filter((item) =>
+    [item.label, item.description, ...item.metadata]
+      .filter((value): value is string => Boolean(value))
+      .some((value) => value.toLowerCase().includes(normalizedQuery)),
+  );
+}
+
+function getNumericOccurrences(occurrences: ClinicalOccurrence[]) {
+  return occurrences
+    .filter(
+      (occurrence) =>
+        typeof occurrence.numericValue === "number" &&
+        Number.isFinite(occurrence.numericValue) &&
+        occurrence.sortTime > Number.NEGATIVE_INFINITY,
+    )
+    .sort((left, right) => left.sortTime - right.sortTime);
+}
+
+type SparklinePoint = { time: number; value: number; raw: ClinicalOccurrence };
+
+function formatNumeric(value: number) {
+  if (!Number.isFinite(value)) {
+    return "-";
+  }
+
+  const hasFraction = Math.abs(value - Math.round(value)) > 0.01;
+  return hasFraction ? value.toFixed(1) : String(Math.round(value));
+}
+
+function formatShortDate(time: number) {
+  if (!Number.isFinite(time)) {
+    return "";
+  }
+
+  const date = new Date(time);
+
+  if (Number.isNaN(date.getTime())) {
+    return "";
+  }
+
+  return date.toLocaleDateString("en-US", {
+    month: "short",
+    day: "numeric",
+    year: "2-digit",
+  });
+}
+
+function Sparkline({ points }: { points: SparklinePoint[] }) {
+  if (points.length < 2) {
+    return null;
+  }
+
+  const width = 360;
+  const height = 140;
+  const padTop = 10;
+  const padRight = 12;
+  const padBottom = 24;
+  const padLeft = 46;
+  const innerW = width - padLeft - padRight;
+  const innerH = height - padTop - padBottom;
+
+  const times = points.map((point) => point.time);
+  const values = points.map((point) => point.value);
+  const minTime = Math.min(...times);
+  const maxTime = Math.max(...times);
+  const rawMin = Math.min(...values);
+  const rawMax = Math.max(...values);
+  const valRange = rawMax - rawMin;
+  const valPad = valRange === 0 ? Math.max(Math.abs(rawMax) * 0.1, 1) : valRange * 0.08;
+  const minVal = rawMin - valPad;
+  const maxVal = rawMax + valPad;
+  const displayValRange = Math.max(maxVal - minVal, 1);
+  const useTimeAxis = maxTime - minTime > 60 * 1000;
+  const timeRange = Math.max(maxTime - minTime, 1);
+
+  const unit = points[points.length - 1].raw.unit;
+
+  const toX = (point: SparklinePoint, index: number) => {
+    if (useTimeAxis) {
+      return padLeft + ((point.time - minTime) / timeRange) * innerW;
+    }
+
+    const denom = Math.max(points.length - 1, 1);
+    return padLeft + (index / denom) * innerW;
+  };
+  const toY = (value: number) => padTop + (1 - (value - minVal) / displayValRange) * innerH;
+
+  const path = points
+    .map((point, index) => `${index === 0 ? "M" : "L"}${toX(point, index).toFixed(1)},${toY(point.value).toFixed(1)}`)
+    .join(" ");
+
+  const areaBottom = (padTop + innerH).toFixed(1);
+  const firstX = toX(points[0], 0).toFixed(1);
+  const lastX = toX(points[points.length - 1], points.length - 1).toFixed(1);
+  const areaPath = `${path} L${lastX},${areaBottom} L${firstX},${areaBottom} Z`;
+
+  const yTicks = [rawMax, (rawMin + rawMax) / 2, rawMin];
+  const unitCaption = prettifyUnit(unit);
+
+  return (
+    <svg
+      className="item-sparkline"
+      role="img"
+      viewBox={`0 0 ${width} ${height}`}
+    >
+      {unitCaption ? (
+        <text
+          className="item-sparkline-unit"
+          x={padLeft - 6}
+          y={padTop - 2}
+          textAnchor="end"
+        >
+          {unitCaption}
+        </text>
+      ) : null}
+      <g className="item-sparkline-axis">
+        {yTicks.map((tick, index) => {
+          const y = toY(tick);
+          return (
+            <g key={`y-tick-${index}`}>
+              <line
+                className="item-sparkline-gridline"
+                x1={padLeft}
+                x2={width - padRight}
+                y1={y}
+                y2={y}
+              />
+              <text className="item-sparkline-tick" x={padLeft - 6} y={y} textAnchor="end" dominantBaseline="middle">
+                {formatNumeric(tick)}
+              </text>
+            </g>
+          );
+        })}
+      </g>
+
+      <line
+        className="item-sparkline-axis-line"
+        x1={padLeft}
+        x2={width - padRight}
+        y1={padTop + innerH}
+        y2={padTop + innerH}
+      />
+
+      <path className="item-sparkline-area" d={areaPath} />
+      <path className="item-sparkline-line" d={path} />
+      {points.map((point, index) => (
+        <circle
+          key={`${point.time}-${index}`}
+          className="item-sparkline-dot"
+          cx={toX(point, index)}
+          cy={toY(point.value)}
+          r={2.4}
+        />
+      ))}
+
+      <text
+        className="item-sparkline-axis-label"
+        x={padLeft}
+        y={height - 6}
+        textAnchor="start"
+      >
+        {useTimeAxis ? formatShortDate(minTime) : `Reading 1`}
+      </text>
+      <text
+        className="item-sparkline-axis-label"
+        x={width - padRight}
+        y={height - 6}
+        textAnchor="end"
+      >
+        {useTimeAxis ? formatShortDate(maxTime) : `Reading ${points.length}`}
+      </text>
+    </svg>
+  );
+}
+
+function DateTimeline({ occurrences }: { occurrences: ClinicalOccurrence[] }) {
+  const dated = occurrences
+    .filter((occurrence) => occurrence.sortTime > Number.NEGATIVE_INFINITY)
+    .sort((left, right) => left.sortTime - right.sortTime);
+
+  if (dated.length === 0) {
+    return null;
+  }
+
+  if (dated.length === 1) {
+    return (
+      <div className="item-dateline item-dateline-single">
+        <span className="item-dateline-dot" aria-hidden="true" />
+        <span>{dated[0].dateLabel ?? "Recorded"}</span>
+      </div>
+    );
+  }
+
+  const minTime = dated[0].sortTime;
+  const maxTime = dated[dated.length - 1].sortTime;
+  const range = Math.max(maxTime - minTime, 1);
+
+  return (
+    <div className="item-dateline" role="img" aria-label="Occurrence timeline">
+      <span className="item-dateline-track" aria-hidden="true" />
+      {dated.map((occurrence, index) => {
+        const position = ((occurrence.sortTime - minTime) / range) * 100;
+
+        return (
+          <span
+            key={`${occurrence.sortTime}-${index}`}
+            className="item-dateline-marker"
+            style={{ left: `${position}%` }}
+            title={occurrence.dateLabel}
+            aria-hidden="true"
+          />
+        );
+      })}
+      <div className="item-dateline-labels">
+        <span>{dated[0].dateLabel}</span>
+        <span>{dated[dated.length - 1].dateLabel}</span>
+      </div>
+    </div>
+  );
+}
+
+function OccurrenceList({ occurrences }: { occurrences: ClinicalOccurrence[] }) {
+  if (occurrences.length === 0) {
+    return null;
+  }
+
+  const limited = occurrences.slice(0, 8);
+
+  return (
+    <ul className="item-occurrence-list">
+      {limited.map((occurrence, index) => (
+        <li key={`${occurrence.sortTime}-${index}`} className="item-occurrence">
+          <span className="item-occurrence-date">{occurrence.dateLabel ?? "Undated"}</span>
+          <span
+            className={`item-occurrence-value ${
+              occurrence.isPlaceholder ? "item-occurrence-value-placeholder" : ""
+            }`}
+          >
+            {occurrence.isPlaceholder ? "Recorded" : occurrence.valueLabel}
+          </span>
+        </li>
+      ))}
+      {occurrences.length > limited.length ? (
+        <li className="item-occurrence item-occurrence-more">
+          +{occurrences.length - limited.length} earlier entries
+        </li>
+      ) : null}
+    </ul>
+  );
+}
+
+function summarizeNumericSeries(points: SparklinePoint[]) {
+  if (points.length === 0) {
+    return null;
+  }
+
+  const values = points.map((point) => point.value);
+  const min = Math.min(...values);
+  const max = Math.max(...values);
+  const avg = values.reduce((total, value) => total + value, 0) / values.length;
+  const latest = points[points.length - 1];
+  const unit = latest.raw.unit;
+  const format = (value: number) => {
+    if (!Number.isFinite(value)) {
+      return "-";
+    }
+
+    const hasFraction = Math.abs(value - Math.round(value)) > 0.01;
+    return hasFraction ? value.toFixed(1) : String(Math.round(value));
+  };
+
+  return {
+    latestLabel: `${format(latest.value)}${unit ? ` ${unit}` : ""}`,
+    minLabel: `${format(min)}${unit ? ` ${unit}` : ""}`,
+    maxLabel: `${format(max)}${unit ? ` ${unit}` : ""}`,
+    avgLabel: `${format(avg)}${unit ? ` ${unit}` : ""}`,
+  };
+}
+
+function renderItem(
+  item: ClinicalItem,
+  key: string,
+  expanded: boolean,
+  onToggle: () => void,
+  tabId: ClinicalTabId,
+) {
+  const occurrenceCount = item.occurrenceCount ?? item.occurrences.length ?? 1;
+  const isRollup = item.presentation === "rollup" || occurrenceCount > 1;
+  const numericPoints: SparklinePoint[] = getNumericOccurrences(item.occurrences).map(
+    (occurrence) => ({
+      time: occurrence.sortTime,
+      value: occurrence.numericValue as number,
+      raw: occurrence,
+    }),
+  );
+  const canSparkline = numericPoints.length >= 2;
+  const series = canSparkline ? summarizeNumericSeries(numericPoints) : null;
+  const isSingleOccurrence = item.occurrences.length <= 1;
+  const isImmunizations = tabId === "immunizations";
+  const allPlaceholder =
+    item.occurrences.length > 0 && item.occurrences.every((occurrence) => occurrence.isPlaceholder);
+  const showChart = canSparkline && !isImmunizations;
+  const showDateTimeline = !showChart && !isImmunizations && !isSingleOccurrence;
+  const showOccurrenceList =
+    !isSingleOccurrence && !showChart && !allPlaceholder;
+  const singleOccurrence = isSingleOccurrence ? item.occurrences[0] : null;
+
+  const summaryBits: string[] = [];
+
+  if (item.description) {
+    summaryBits.push(item.description);
+  }
+
+  if (item.metadata.length > 0) {
+    summaryBits.push(item.metadata[0]);
+  }
+
+  return (
+    <li key={key} className={`item-row ${expanded ? "item-row-expanded" : ""}`}>
+      <button type="button" className="item-row-head" onClick={onToggle} aria-expanded={expanded}>
+        <span className="item-row-label">
+          <span className="item-row-title">{item.label}</span>
+          {summaryBits.length > 0 ? (
+            <span className="item-row-summary">{summaryBits.join(" · ")}</span>
+          ) : null}
+        </span>
+        <span className="item-row-end">
+          {isRollup ? (
+            <span className="item-row-count">{occurrenceCount}</span>
+          ) : null}
+          <span aria-hidden="true" className={`item-row-chevron ${expanded ? "item-row-chevron-open" : ""}`}>
+            ›
+          </span>
+        </span>
+      </button>
+
+      {expanded ? (
+        <div className={`item-row-body ${isSingleOccurrence ? "item-row-body-single" : ""}`}>
+          {singleOccurrence ? (
+            <div className="item-row-single-value">
+              <span className="item-row-single-date">{singleOccurrence.dateLabel ?? "Undated"}</span>
+              <span
+                className={`item-row-single-label ${
+                  singleOccurrence.isPlaceholder ? "item-row-single-label-placeholder" : ""
+                }`}
+              >
+                {singleOccurrence.isPlaceholder ? "Recorded (no captured value)" : singleOccurrence.valueLabel}
+              </span>
+            </div>
+          ) : (
+            <>
+              {showChart && series ? (
+                <>
+                  <div className="item-row-series-meta">
+                    <span>
+                      <em>Latest</em>
+                      <strong>{series.latestLabel}</strong>
+                    </span>
+                    <span>
+                      <em>Min</em>
+                      <strong>{series.minLabel}</strong>
+                    </span>
+                    <span>
+                      <em>Max</em>
+                      <strong>{series.maxLabel}</strong>
+                    </span>
+                    <span>
+                      <em>Average</em>
+                      <strong>{series.avgLabel}</strong>
+                    </span>
+                  </div>
+                  <Sparkline points={numericPoints} />
+                </>
+              ) : showDateTimeline ? (
+                <DateTimeline occurrences={item.occurrences} />
+              ) : null}
+              {showOccurrenceList ? <OccurrenceList occurrences={item.occurrences} /> : null}
+            </>
+          )}
+        </div>
+      ) : null}
+    </li>
+  );
+}
+
 export function LiveHealthExViewer({ fallbackSummary }: LiveHealthExViewerProps) {
   const [token, setToken] = useState("");
   const [personId, setPersonId] = useState("");
   const [fetchState, setFetchState] = useState<FetchState>({ status: "idle" });
+  const [selectedTabId, setSelectedTabId] = useState<ClinicalTabId | null>(null);
+  const [expandedItems, setExpandedItems] = useState<Record<string, boolean>>({});
+  const [tabSearch, setTabSearch] = useState<Record<string, string>>({});
+  const [showSource, setShowSource] = useState(false);
 
-  const activeSummary =
-    fetchState.status === "success" ? fetchState.summary : fallbackSummary;
-
+  const activeSummary = fetchState.status === "success" ? fetchState.summary : fallbackSummary;
+  const isLiveSummary = fetchState.status === "success";
   const derivedPersonId = useMemo(() => decodeJwtSub(token), [token]);
+  const activeTabId =
+    activeSummary?.tabs.find((tab) => tab.id === selectedTabId)?.id ??
+    activeSummary?.tabs.find((tab) => tab.hasData)?.id ??
+    activeSummary?.tabs[0]?.id ??
+    null;
+  const activeTab = activeSummary?.tabs.find((tab) => tab.id === activeTabId) ?? activeSummary?.tabs[0] ?? null;
+  const activeTabKey = `${activeSummary?.lastPulledLabel ?? "empty"}:${activeTabId ?? "none"}`;
+  const searchValue = tabSearch[activeTabKey] ?? "";
+  const filteredItems = activeTab ? filterClinicalItems(activeTab.items, searchValue) : [];
 
   async function handleFetch() {
     const authToken = token.trim();
@@ -131,204 +538,158 @@ export function LiveHealthExViewer({ fallbackSummary }: LiveHealthExViewerProps)
     }
   }
 
+  function toggleItem(itemKey: string) {
+    setExpandedItems((current) => ({
+      ...current,
+      [itemKey]: !current[itemKey],
+    }));
+  }
+
+  function setTabSearchValue(tabKey: string, value: string) {
+    setTabSearch((current) => ({
+      ...current,
+      [tabKey]: value,
+    }));
+  }
+
+  function renderTabButton(tab: ClinicalTab) {
+    return (
+      <button
+        key={tab.id}
+        type="button"
+        className={`clinical-tab-button ${activeTabId === tab.id ? "clinical-tab-button-active" : ""}`}
+        onClick={() => setSelectedTabId(tab.id)}
+      >
+        <span>{tab.label}</span>
+        <strong>{tab.totalCount}</strong>
+      </button>
+    );
+  }
+
+  const fetchDisabled = fetchState.status === "loading";
+  const fetchLabel = fetchState.status === "loading" ? "Loading..." : "Refresh bundle";
+
   return (
     <>
-      <section className="live-card">
-        <div className="live-card-header">
-          <div>
-            <p className="section-eyebrow">Live HealthEx Fetch</p>
-            <h2 className="live-card-title">Browser-side patient pull</h2>
+      <section className={`source-bar ${showSource ? "source-bar-open" : ""}`}>
+        <div className="source-bar-head">
+          <div className="source-bar-copy">
+            <span className="source-bar-title">HealthEx bundle</span>
+            <span className="source-bar-meta">
+              {fetchState.status === "success"
+                ? "Showing the latest live pull."
+                : fetchState.status === "loading"
+                  ? "Fetching the live bundle..."
+                  : fetchState.status === "error"
+                    ? "Last fetch failed."
+                    : activeSummary
+                      ? "Showing the local fallback snapshot."
+                      : "No bundle loaded yet."}
+            </span>
           </div>
-          <button
-            type="button"
-            className="primary-button"
-            onClick={handleFetch}
-            disabled={fetchState.status === "loading"}
-          >
-            {fetchState.status === "loading" ? "Loading..." : "Load live bundle"}
-          </button>
+          <div className="source-bar-actions">
+            <button
+              type="button"
+              className="source-bar-link"
+              onClick={() => setShowSource((current) => !current)}
+              aria-expanded={showSource}
+            >
+              {showSource ? "Hide source" : "Configure source"}
+            </button>
+            <button
+              type="button"
+              className="primary-button"
+              onClick={handleFetch}
+              disabled={fetchDisabled}
+            >
+              {fetchLabel}
+            </button>
+          </div>
         </div>
 
-        <p className="live-card-copy">
-          Paste the current patient token from `app.healthex.io`. The viewer will
-          derive the `Person` ID from the JWT `sub` if you leave the field blank,
-          then fetch the full paginated `$everything` bundle directly in the
-          browser.
-        </p>
-
-        <div className="live-form-grid">
-          <label className="field-group">
-            <span>HealthEx patient token</span>
-            <textarea
-              value={token}
-              onChange={(event) => setToken(event.target.value)}
-              placeholder="Paste the current bearer token here"
-              rows={5}
-            />
-          </label>
-
-          <div className="live-side-fields">
+        {showSource ? (
+          <div className="source-bar-body">
             <label className="field-group">
-              <span>Person ID</span>
-              <input
-                value={personId}
-                onChange={(event) => setPersonId(event.target.value)}
-                placeholder={derivedPersonId ?? "Will auto-fill from token sub"}
+              <span>Patient token</span>
+              <textarea
+                value={token}
+                onChange={(event) => setToken(event.target.value)}
+                placeholder="Paste the current bearer token"
+                rows={3}
               />
             </label>
 
-            <div className="derived-hint">
-              <span>Derived from token</span>
-              <strong>{derivedPersonId ?? "Unavailable until the token parses"}</strong>
+            <div className="source-bar-side">
+              <label className="field-group">
+                <span>Person ID</span>
+                <input
+                  value={personId}
+                  onChange={(event) => setPersonId(event.target.value)}
+                  placeholder={derivedPersonId ?? "Auto-fills from token sub"}
+                />
+              </label>
+              <div className="derived-hint">
+                <span>From token</span>
+                <strong>{derivedPersonId ?? "Unavailable until the token parses"}</strong>
+              </div>
             </div>
           </div>
-        </div>
+        ) : null}
 
         {fetchState.status === "error" ? (
           <p className="status-message error-message">{fetchState.message}</p>
         ) : null}
-
-        {fetchState.status === "success" ? (
-          <p className="status-message success-message">
-            Live browser fetch succeeded. Rendering the live bundle below.
-          </p>
-        ) : null}
       </section>
 
       {activeSummary ? (
-        <>
-          <section className="hero-card">
-            <div className="hero-band">
-              <p className="hero-eyebrow">
-                {fetchState.status === "success" ? "Live HealthEx Bundle" : "Local HealthEx Pull"}
-              </p>
-              <h1 className="hero-title">{activeSummary.patientName}</h1>
-              <p className="hero-copy">
-                This page groups the supported HealthEx FHIR resource types into
-                simple sections and swaps automatically from the local snapshot to
-                the live browser pull when one succeeds.
-              </p>
-            </div>
+        <section className="review-shell">
+          <StreamingChartSummary summary={activeSummary} useLiveSummary={isLiveSummary} />
 
-            <div className="hero-body summary-grid">
-              <div className="hero-panel">
-                <h2 className="hero-panel-title">Bundle snapshot</h2>
-                <dl className="stats-list">
-                  <div>
-                    <dt>Supported resources</dt>
-                    <dd>{activeSummary.supportedResourceTotal}</dd>
-                  </div>
-                  <div>
-                    <dt>Lead sections available</dt>
-                    <dd>{activeSummary.leadTypes.length}</dd>
-                  </div>
-                  <div>
-                    <dt>Binary assets</dt>
-                    <dd>{activeSummary.binaryCount}</dd>
-                  </div>
-                  <div>
-                    <dt>Source</dt>
-                    <dd className="stats-file">{activeSummary.sourceFile}</dd>
-                  </div>
-                </dl>
+          <div className="clinical-tabs-bar clinical-tabs-bar-compact">
+            {activeSummary.tabs.map(renderTabButton)}
+          </div>
+
+          {activeTab ? (
+            <section className="clinical-review-panel">
+              <div className="tab-search">
+                <input
+                  value={searchValue}
+                  onChange={(event) => setTabSearchValue(activeTabKey, event.target.value)}
+                  placeholder={activeTab.searchPlaceholder}
+                  aria-label={activeTab.searchPlaceholder}
+                />
               </div>
 
-              <div className="hero-panel">
-                <h2 className="hero-panel-title">Phase 2 readout</h2>
+              {activeTab.items.length === 0 ? (
+                <p className="empty-state tab-empty">{activeTab.emptyHint}</p>
+              ) : filteredItems.length === 0 ? (
+                <p className="empty-state tab-empty">No matches for that search.</p>
+              ) : (
+                <ul className="item-list">
+                  {filteredItems.map((item, index) => {
+                    const itemKey = `${activeTabKey}:${item.label}:${index}`;
 
-                {activeSummary.leadTypes.length > 0 ? (
-                  <ul className="pill-list">
-                    {activeSummary.leadTypes.map((type) => (
-                      <li key={type} className="pill-list-item">
-                        <span>{SUPPORTED_TYPE_LABELS[type]}</span>
-                        <strong>Lead</strong>
-                      </li>
-                    ))}
-                  </ul>
-                ) : (
-                  <p className="pill-list-empty">No lead sections are available yet in this snapshot.</p>
-                )}
-
-                <ul className="hero-note-list">
-                  {activeSummary.notes.map((note) => (
-                    <li key={note} className="hero-note">
-                      {note}
-                    </li>
-                  ))}
+                    return renderItem(
+                      item,
+                      itemKey,
+                      Boolean(expandedItems[itemKey]),
+                      () => toggleItem(itemKey),
+                      activeTab.id,
+                    );
+                  })}
                 </ul>
-              </div>
-
-              <div className="hero-panel">
-                <h2 className="hero-panel-title">Available supported FHIR types</h2>
-
-                {Object.entries(activeSummary.resourceCounts).some(
-                  ([type, count]) => Object.hasOwn(SUPPORTED_TYPE_LABELS, type) && count > 0,
-                ) ? (
-                  <ul className="pill-list">
-                    {Object.entries(activeSummary.resourceCounts)
-                      .filter(
-                        ([type, count]) => Object.hasOwn(SUPPORTED_TYPE_LABELS, type) && count > 0,
-                      )
-                      .map(([type, count]) => (
-                        <li key={type} className="pill-list-item">
-                          <span>{SUPPORTED_TYPE_LABELS[type as keyof typeof SUPPORTED_TYPE_LABELS]}</span>
-                          <strong>{count}</strong>
-                        </li>
-                      ))}
-                  </ul>
-                ) : (
-                  <p className="pill-list-empty">
-                    This snapshot does not currently include supported structured resources.
-                  </p>
-                )}
-              </div>
-            </div>
-          </section>
-
-          <section className="section-grid">
-            {activeSummary.sections.map((section) => (
-              <article key={section.type} className="section-card">
-                <div className="section-card-header">
-                  <div>
-                    <p className="section-eyebrow">{section.type}</p>
-                    <h2>{section.title}</h2>
-                  </div>
-                  <div className="section-card-meta">
-                    <span className={`section-status section-status-${section.status}`}>
-                      {sectionStatusLabels[section.status]}
-                    </span>
-                    <span className="section-count">{section.count}</span>
-                  </div>
-                </div>
-
-                {section.guidance ? <p className="section-guidance">{section.guidance}</p> : null}
-
-                {section.items.length > 0 ? (
-                  <ul className="resource-list">
-                    {section.items.map((item, index) => (
-                      <li key={`${section.type}-${index}`} className="resource-item">
-                        <div className="resource-item-main">
-                          <h3>{item.label}</h3>
-                          {item.description ? <p>{item.description}</p> : null}
-                        </div>
-                        {item.metadata.length > 0 ? (
-                          <ul className="resource-meta">
-                            {item.metadata.map((value) => (
-                              <li key={value}>{value}</li>
-                            ))}
-                          </ul>
-                        ) : null}
-                      </li>
-                    ))}
-                  </ul>
-                ) : (
-                  <p className="empty-state">{section.emptyMessage}</p>
-                )}
-              </article>
-            ))}
-          </section>
-        </>
-      ) : null}
+              )}
+            </section>
+          ) : null}
+        </section>
+      ) : (
+        <section className="review-shell review-shell-empty">
+          <p className="review-empty-copy">
+            Load a live browser pull to render the summary and review workspace. If a local snapshot
+            becomes available later, it will appear here as fallback context.
+          </p>
+        </section>
+      )}
     </>
   );
 }

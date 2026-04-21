@@ -75,16 +75,52 @@ export type FhirBundle = {
   total?: number;
 };
 
+export type ClinicalOccurrence = {
+  categoryCode?: string;
+  date?: string;
+  dateLabel?: string;
+  isPlaceholder?: boolean;
+  note?: string;
+  numericValue?: number;
+  sortTime: number;
+  unit?: string;
+  valueLabel: string;
+};
+
+export type ClinicalItem = {
+  description?: string;
+  label: string;
+  metadata: string[];
+  occurrences: ClinicalOccurrence[];
+  occurrenceCount?: number;
+  presentation?: "event" | "rollup";
+};
+
+export type ClinicalTabId =
+  | "conditions"
+  | "medications"
+  | "labs"
+  | "vitals"
+  | "immunizations";
+
+export type ClinicalTab = {
+  emptyHint: string;
+  hasData: boolean;
+  id: ClinicalTabId;
+  items: ClinicalItem[];
+  label: string;
+  searchPlaceholder: string;
+  totalCount: number;
+};
+
 export type ClinicalSection = {
   count: number;
+  displayMode?: "events" | "rollup";
   emptyMessage: string;
   guidance?: string;
-  items: Array<{
-    description?: string;
-    label: string;
-    metadata: string[];
-  }>;
+  items: ClinicalItem[];
   status: SectionStatus;
+  summaryCaption?: string;
   title: string;
   type: SupportedType;
 };
@@ -100,6 +136,7 @@ export type HealthExSummary = {
   sections: ClinicalSection[];
   sourceFile: string | null;
   supportedResourceTotal: number;
+  tabs: ClinicalTab[];
 };
 
 export function formatDisplayDate(value?: string) {
@@ -128,6 +165,20 @@ function pickCodingLabel(codings?: Coding[]) {
   return codings?.find((coding) => coding.display)?.display;
 }
 
+function formatClinicalCode(concept?: CodeableConcept) {
+  const coding = concept?.coding?.find((entry) => entry.code);
+
+  if (!coding?.code) {
+    return undefined;
+  }
+
+  if (coding.system?.toLowerCase().includes("snomed")) {
+    return `SNOMED ${coding.code}`;
+  }
+
+  return coding.code;
+}
+
 function pickPatientName(resources: FhirResource[]) {
   const personOrPatient = resources.find(
     (resource) => resource.resourceType === "Person" || resource.resourceType === "Patient",
@@ -139,27 +190,537 @@ function pickPatientName(resources: FhirResource[]) {
   return fullName || "HealthEx patient";
 }
 
-function buildObservationLabel(resource: FhirResource) {
-  const valueQuantity = (resource as FhirResource & { valueQuantity?: { unit?: string; value?: number | string } })
-    .valueQuantity;
+const UCUM_DISPLAY: Record<string, string> = {
+  "mm[hg]": "mmHg",
+  "cel": "°C",
+  "[degf]": "°F",
+  "[in_i]": "in",
+  "[lb_av]": "lb",
+  "kg/m2": "kg/m²",
+  "/min": "/min",
+};
+
+export function prettifyUnit(unit?: string) {
+  if (!unit) {
+    return unit;
+  }
+
+  const key = unit.toLowerCase();
+  return UCUM_DISPLAY[key] ?? unit;
+}
+
+const NARRATIVE_OBSERVATION_LABELS = new Set([
+  "disclaimer",
+  "gross description",
+  "microscopic description",
+  "comment",
+  "color",
+  "clinical history",
+  "clinical information",
+  "significant clinical history",
+  "alcohol use history",
+  "drug use history",
+  "tobacco use history",
+  "social history",
+  "family history",
+  "history",
+  "bun/creatinine ratio",
+  "final diagnosis",
+  "impression",
+  "specimen",
+  "procedure note",
+  "addendum",
+  "note",
+]);
+
+const NARRATIVE_VALUE_PATTERNS = [/see note/i, /same as/i, /^yes$/i, /^no$/i];
+
+const NARRATIVE_VALUE_LENGTH_THRESHOLD = 80;
+
+function isNarrativeObservation(resource: FhirResource) {
+  const label = pickCodeText(resource.code).toLowerCase().trim();
+
+  if (NARRATIVE_OBSERVATION_LABELS.has(label)) {
+    return true;
+  }
+
+  const valueQuantity = (
+    resource as FhirResource & { valueQuantity?: { unit?: string; value?: number | string } }
+  ).valueQuantity;
+
+  if (valueQuantity?.value !== undefined) {
+    return false;
+  }
+
+  const valueString = (resource as FhirResource & { valueString?: string }).valueString;
+
+  if (valueString) {
+    const trimmed = valueString.trim();
+
+    if (NARRATIVE_VALUE_PATTERNS.some((pattern) => pattern.test(trimmed))) {
+      return true;
+    }
+
+    if (trimmed.length > NARRATIVE_VALUE_LENGTH_THRESHOLD) {
+      return true;
+    }
+  }
+
+  return false;
+}
+
+type ObservationComponent = {
+  code?: CodeableConcept;
+  valueQuantity?: { unit?: string; value?: number | string };
+};
+
+function toNumericQuantity(value: number | string | undefined) {
+  if (value === undefined) {
+    return undefined;
+  }
+
+  const numeric = typeof value === "number" ? value : Number(value);
+  return Number.isFinite(numeric) ? numeric : undefined;
+}
+
+function pickPrimaryComponent(components: ObservationComponent[]) {
+  const systolic = components.find((component) =>
+    pickCodeText(component.code).toLowerCase().includes("systolic"),
+  );
+
+  if (systolic?.valueQuantity?.value !== undefined) {
+    return systolic;
+  }
+
+  return components.find((component) => component.valueQuantity?.value !== undefined);
+}
+
+function extractObservationValue(resource: FhirResource): {
+  isPlaceholder?: boolean;
+  numericValue?: number;
+  unit?: string;
+  valueLabel: string;
+} {
+  const valueQuantity = (
+    resource as FhirResource & { valueQuantity?: { unit?: string; value?: number | string } }
+  ).valueQuantity;
   const valueString = (resource as FhirResource & { valueString?: string }).valueString;
   const valueCodeableConcept = (
     resource as FhirResource & { valueCodeableConcept?: CodeableConcept }
   ).valueCodeableConcept;
+  const components = (resource as FhirResource & { component?: ObservationComponent[] }).component;
 
   if (valueQuantity?.value !== undefined) {
-    return `${valueQuantity.value}${valueQuantity.unit ? ` ${valueQuantity.unit}` : ""}`;
+    const numeric = toNumericQuantity(valueQuantity.value);
+    const unit = prettifyUnit(valueQuantity.unit);
+    const valueLabel = `${valueQuantity.value}${unit ? ` ${unit}` : ""}`;
+
+    return {
+      numericValue: numeric,
+      unit,
+      valueLabel,
+    };
+  }
+
+  if (components && components.length > 0) {
+    const primary = pickPrimaryComponent(components);
+
+    if (primary?.valueQuantity?.value !== undefined) {
+      const numeric = toNumericQuantity(primary.valueQuantity.value);
+      const unit = prettifyUnit(primary.valueQuantity.unit);
+      const primaryLabel = pickCodeText(primary.code).toLowerCase();
+      const isBloodPressure = primaryLabel.includes("systolic");
+      const diastolic = isBloodPressure
+        ? components.find((component) =>
+            pickCodeText(component.code).toLowerCase().includes("diastolic"),
+          )
+        : undefined;
+      const diastolicValue = diastolic?.valueQuantity?.value;
+
+      const valueLabel =
+        diastolicValue !== undefined
+          ? `${primary.valueQuantity.value}/${diastolicValue}${unit ? ` ${unit}` : ""}`
+          : `${primary.valueQuantity.value}${unit ? ` ${unit}` : ""}`;
+
+      return {
+        numericValue: numeric,
+        unit,
+        valueLabel,
+      };
+    }
   }
 
   if (valueString) {
-    return valueString;
+    return { valueLabel: valueString };
   }
 
   if (valueCodeableConcept) {
-    return pickCodeText(valueCodeableConcept);
+    return { valueLabel: pickCodeText(valueCodeableConcept) };
   }
 
-  return "Result available";
+  return { isPlaceholder: true, valueLabel: "Result available" };
+}
+
+function parseSortTime(value?: string) {
+  if (!value) {
+    return Number.NEGATIVE_INFINITY;
+  }
+
+  const parsed = Date.parse(value);
+  return Number.isNaN(parsed) ? Number.NEGATIVE_INFINITY : parsed;
+}
+
+function sortOccurrencesLatestFirst(occurrences: ClinicalOccurrence[]) {
+  return [...occurrences].sort((left, right) => right.sortTime - left.sortTime);
+}
+
+function extractObservationCategory(resource: FhirResource) {
+  const category = (
+    resource as FhirResource & { category?: Array<{ coding?: Coding[] }> }
+  ).category;
+
+  if (!category) {
+    return undefined;
+  }
+
+  for (const entry of category) {
+    for (const coding of entry.coding ?? []) {
+      if (coding.code) {
+        return coding.code.toLowerCase();
+      }
+    }
+  }
+
+  return undefined;
+}
+
+function buildObservationItems(sectionResources: FhirResource[]): ClinicalItem[] {
+  const groups = new Map<
+    string,
+    {
+      occurrences: ClinicalOccurrence[];
+    }
+  >();
+
+  for (const resource of sectionResources) {
+    if (isNarrativeObservation(resource)) {
+      continue;
+    }
+
+    const label = pickCodeText(resource.code);
+    const date = resource.effectiveDateTime ?? resource.issued;
+    const sortTime = parseSortTime(date);
+    const value = extractObservationValue(resource);
+    const categoryCode = extractObservationCategory(resource);
+
+    const group = groups.get(label) ?? { occurrences: [] };
+    group.occurrences.push({
+      categoryCode,
+      date,
+      dateLabel: formatDisplayDate(date),
+      isPlaceholder: value.isPlaceholder,
+      numericValue: value.numericValue,
+      sortTime,
+      unit: value.unit,
+      valueLabel: value.valueLabel,
+    });
+    groups.set(label, group);
+  }
+
+  return [...groups.entries()]
+    .map(([label, group]) => {
+      const sorted = sortOccurrencesLatestFirst(group.occurrences);
+      const latest = sorted[0];
+      const latestSortTime = latest?.sortTime ?? Number.NEGATIVE_INFINITY;
+      const description = latest
+        ? latest.isPlaceholder
+          ? undefined
+          : `Latest result: ${latest.valueLabel}`
+        : undefined;
+
+      return {
+        label,
+        presentation: "rollup" as const,
+        occurrenceCount: sorted.length,
+        description,
+        metadata: [
+          latest?.dateLabel ? `Most recent: ${latest.dateLabel}` : undefined,
+        ].filter(Boolean) as string[],
+        occurrences: sorted,
+        latestSortTime,
+      };
+    })
+    .sort((left, right) => {
+      const timeDelta = right.latestSortTime - left.latestSortTime;
+
+      if (timeDelta !== 0) {
+        return timeDelta;
+      }
+
+      const countDelta = (right.occurrenceCount ?? 0) - (left.occurrenceCount ?? 0);
+
+      if (countDelta !== 0) {
+        return countDelta;
+      }
+
+      return left.label.localeCompare(right.label);
+    })
+    .map(({ latestSortTime: _unused, ...rest }) => rest);
+}
+
+function normalizeVaccineLabel(label: string) {
+  return label
+    .replace(/\s*#?\s*\d+\s*$/i, "")
+    .replace(/([A-Za-z])\s*(\d+)\s*$/i, "$1")
+    .trim()
+    .toLowerCase();
+}
+
+function buildImmunizationItems(sectionResources: FhirResource[]): ClinicalItem[] {
+  const groups = new Map<
+    string,
+    {
+      displayLabel: string;
+      occurrences: ClinicalOccurrence[];
+      statuses: string[];
+    }
+  >();
+
+  for (const resource of sectionResources) {
+    const originalLabel = pickCodeText(resource.vaccineCode);
+    const key = normalizeVaccineLabel(originalLabel) || originalLabel.toLowerCase();
+    const date = resource.occurrenceDateTime;
+    const sortTime = parseSortTime(date);
+    const status = resource.status;
+
+    const group = groups.get(key) ?? {
+      displayLabel: originalLabel,
+      occurrences: [],
+      statuses: [],
+    };
+
+    const trailingNumber = /\s*#?\s*\d+\s*$/;
+    const candidateClean = !trailingNumber.test(originalLabel);
+    const currentClean = !trailingNumber.test(group.displayLabel);
+
+    if (
+      (candidateClean && !currentClean) ||
+      (candidateClean === currentClean && originalLabel.length > group.displayLabel.length)
+    ) {
+      group.displayLabel = originalLabel;
+    }
+
+    group.occurrences.push({
+      date,
+      dateLabel: formatDisplayDate(date),
+      note: status,
+      sortTime,
+      valueLabel: "Dose administered",
+    });
+
+    if (status && !group.statuses.includes(status)) {
+      group.statuses.push(status);
+    }
+
+    groups.set(key, group);
+  }
+
+  return [...groups.values()]
+    .map((group) => {
+      const sorted = sortOccurrencesLatestFirst(group.occurrences);
+      const latest = sorted[0];
+      const latestSortTime = latest?.sortTime ?? Number.NEGATIVE_INFINITY;
+
+      return {
+        label: group.displayLabel,
+        presentation: "rollup" as const,
+        occurrenceCount: sorted.length,
+        description: latest?.dateLabel
+          ? `Most recent dose: ${latest.dateLabel}`
+          : "Recorded in immunization history",
+        metadata: group.statuses,
+        occurrences: sorted,
+        latestSortTime,
+      };
+    })
+    .sort((left, right) => {
+      const timeDelta = right.latestSortTime - left.latestSortTime;
+
+      if (timeDelta !== 0) {
+        return timeDelta;
+      }
+
+      const countDelta = (right.occurrenceCount ?? 0) - (left.occurrenceCount ?? 0);
+
+      if (countDelta !== 0) {
+        return countDelta;
+      }
+
+      return left.label.localeCompare(right.label);
+    })
+    .map(({ latestSortTime: _unused, ...rest }) => rest);
+}
+
+function buildSingleOccurrenceEvent(
+  dateValue: string | undefined,
+  statusLabel: string | undefined,
+): ClinicalOccurrence[] {
+  const sortTime = parseSortTime(dateValue);
+
+  return [
+    {
+      date: dateValue,
+      dateLabel: formatDisplayDate(dateValue),
+      note: statusLabel,
+      sortTime,
+      valueLabel: statusLabel ?? "Recorded",
+    },
+  ];
+}
+
+const VITAL_LABEL_KEYWORDS = [
+  "blood pressure",
+  "heart rate",
+  "pulse",
+  "temperature",
+  "respiration",
+  "respirations",
+  "respiratory",
+  "oxygen",
+  "spo2",
+  "o2 sat",
+  "body mass index",
+  "bmi",
+  "height",
+  "weight",
+  "pain score",
+];
+
+const VITAL_UNIT_ALLOWLIST = new Set(
+  [
+    "mmhg",
+    "mm[hg]",
+    "bpm",
+    "/min",
+    "kg",
+    "lb",
+    "cm",
+    "in",
+    "[in_i]",
+    "°c",
+    "cel",
+    "°f",
+    "[degf]",
+    "%",
+  ].map((value) => value.toLowerCase()),
+);
+
+function classifyObservationItem(item: ClinicalItem): "labs" | "vitals" {
+  const categoryCodes = new Set(
+    item.occurrences
+      .map((occurrence) => occurrence.categoryCode)
+      .filter((value): value is string => Boolean(value)),
+  );
+
+  if (categoryCodes.has("vital-signs")) {
+    return "vitals";
+  }
+
+  if (categoryCodes.has("laboratory")) {
+    return "labs";
+  }
+
+  const label = item.label.toLowerCase();
+
+  if (VITAL_LABEL_KEYWORDS.some((keyword) => label.includes(keyword))) {
+    return "vitals";
+  }
+
+  const unit = item.occurrences[0]?.unit?.toLowerCase();
+
+  if (unit && VITAL_UNIT_ALLOWLIST.has(unit) && label.split(/\s+/).length <= 3) {
+    return "vitals";
+  }
+
+  return "labs";
+}
+
+function buildConditionItems(sectionResources: FhirResource[]): ClinicalItem[] {
+  return sectionResources
+    .map((resource) => {
+      const status = pickCodingLabel(resource.clinicalStatus?.coding);
+      const dateValue = resource.onsetDateTime ?? resource.onsetPeriod?.start ?? resource.recordedDate;
+
+      return {
+        label: pickCodeText(resource.code),
+        description: status,
+        metadata: [
+          formatClinicalCode(resource.code),
+          formatDisplayDate(dateValue),
+        ].filter(Boolean) as string[],
+        occurrences: buildSingleOccurrenceEvent(dateValue, status),
+        presentation: "event" as const,
+      };
+    })
+    .sort((left, right) => (right.occurrences[0]?.sortTime ?? 0) - (left.occurrences[0]?.sortTime ?? 0));
+}
+
+function buildMedicationItems(sectionResources: FhirResource[]): ClinicalItem[] {
+  const groups = new Map<
+    string,
+    {
+      count: number;
+      codeLabel?: string;
+      dateLabel?: string;
+      dateValue?: string;
+      label: string;
+      status?: string;
+    }
+  >();
+
+  for (const resource of sectionResources) {
+    const label = resource.medicationCodeableConcept
+      ? pickCodeText(resource.medicationCodeableConcept)
+      : resource.medicationReference?.display ?? "Medication";
+    const status = resource.status;
+    const dateValue = resource.authoredOn;
+    const dayKey = dateValue ? dateValue.slice(0, 10) : "undated";
+    const key = `${label.toLowerCase()}::${dayKey}::${status ?? ""}`;
+
+    const existing = groups.get(key);
+
+    if (existing) {
+      existing.count += 1;
+      continue;
+    }
+
+    groups.set(key, {
+      codeLabel: formatClinicalCode(resource.medicationCodeableConcept),
+      count: 1,
+      dateLabel: formatDisplayDate(dateValue),
+      dateValue,
+      label,
+      status,
+    });
+  }
+
+  return [...groups.values()]
+    .map((group) => {
+      const metadata = [
+        group.codeLabel,
+        group.dateLabel,
+        group.count > 1 ? `${group.count} orders` : undefined,
+      ].filter((value): value is string => Boolean(value));
+
+      return {
+        label: group.label,
+        description: group.status,
+        metadata,
+        occurrences: buildSingleOccurrenceEvent(group.dateValue, group.status),
+        presentation: "event" as const,
+      };
+    })
+    .sort((left, right) => (right.occurrences[0]?.sortTime ?? 0) - (left.occurrences[0]?.sortTime ?? 0));
 }
 
 function buildSectionStatus(type: SupportedType, resourceCounts: Record<string, number>, leadTypes: SupportedType[]) {
@@ -183,7 +744,7 @@ function buildSectionGuidance(
   binaryCount: number,
 ) {
   if (status === "lead") {
-    return "This is currently one of the strongest structured sections in the saved bundle.";
+    return "This is currently one of the strongest structured sections in the current bundle.";
   }
 
   if (status === "available") {
@@ -191,7 +752,7 @@ function buildSectionGuidance(
   }
 
   if (type === "DocumentReference" && binaryCount > 0) {
-    return "This saved snapshot contains Binary attachments, but no structured DocumentReference resources.";
+    return "This bundle includes file attachments, but no structured document references.";
   }
 
   if (type === "Immunization") {
@@ -220,105 +781,176 @@ function buildSection(
   if (type === "AllergyIntolerance") {
     return {
       count,
-      type,
-      status,
-      title: "Allergies",
+      displayMode: "events",
       emptyMessage: "No allergy records were found in the current HealthEx bundle.",
       guidance,
       items: sectionResources.map((resource) => ({
         label: pickCodeText(resource.code),
-        description: resource.patient?.display ?? resource.subject?.display,
+        description: pickCodingLabel(resource.clinicalStatus?.coding),
         metadata: [
-          pickCodingLabel(resource.clinicalStatus?.coding),
+          formatClinicalCode(resource.code),
           pickCodingLabel(resource.verificationStatus?.coding),
           formatDisplayDate(resource.recordedDate),
         ].filter(Boolean) as string[],
+        occurrences: buildSingleOccurrenceEvent(
+          resource.recordedDate,
+          pickCodingLabel(resource.clinicalStatus?.coding),
+        ),
       })),
+      status,
+      title: "Allergies",
+      type,
     };
   }
 
   if (type === "Condition") {
     return {
       count,
-      type,
-      status,
-      title: "Conditions",
+      displayMode: "events",
       emptyMessage: "No structured condition resources were found in the current HealthEx bundle.",
       guidance,
-      items: sectionResources.map((resource) => ({
-        label: pickCodeText(resource.code),
-        description: resource.subject?.display,
-        metadata: [
-          pickCodingLabel(resource.clinicalStatus?.coding),
-          formatDisplayDate(resource.onsetDateTime ?? resource.onsetPeriod?.start),
-        ].filter(Boolean) as string[],
-      })),
+      items: buildConditionItems(sectionResources),
+      status,
+      title: "Conditions",
+      type,
     };
   }
 
   if (type === "MedicationRequest") {
     return {
       count,
-      type,
-      status,
-      title: "Medications",
+      displayMode: "events",
       emptyMessage: "No medication requests were found in the current HealthEx bundle.",
       guidance,
-      items: sectionResources.map((resource) => ({
-        label: resource.medicationCodeableConcept
-          ? pickCodeText(resource.medicationCodeableConcept)
-          : resource.medicationReference?.display ?? "Medication",
-        description: resource.subject?.display,
-        metadata: [resource.status, formatDisplayDate(resource.authoredOn)].filter(Boolean) as string[],
-      })),
+      items: buildMedicationItems(sectionResources),
+      status,
+      title: "Medications",
+      type,
     };
   }
 
   if (type === "Observation") {
     return {
       count,
-      type,
-      status,
-      title: "Observations",
+      displayMode: "rollup",
       emptyMessage: "No structured observations were found in the current HealthEx bundle.",
       guidance,
-      items: sectionResources.map((resource) => ({
-        label: pickCodeText(resource.code),
-        description: buildObservationLabel(resource),
-        metadata: [formatDisplayDate(resource.effectiveDateTime ?? resource.issued)].filter(Boolean) as string[],
-      })),
+      items: buildObservationItems(sectionResources),
+      status,
+      summaryCaption:
+        count > 0 ? "Grouped by test name and sorted by the most recent result." : undefined,
+      title: "Observations",
+      type,
     };
   }
 
   if (type === "Immunization") {
     return {
       count,
-      type,
-      status,
-      title: "Immunizations",
+      displayMode: "rollup",
       emptyMessage: "No immunization resources are currently available in the current HealthEx bundle.",
       guidance,
-      items: sectionResources.map((resource) => ({
-        label: pickCodeText(resource.vaccineCode),
-        description: resource.patient?.display ?? resource.subject?.display,
-        metadata: [resource.status, formatDisplayDate(resource.occurrenceDateTime)].filter(Boolean) as string[],
-      })),
+      items: buildImmunizationItems(sectionResources),
+      status,
+      summaryCaption:
+        count > 0 ? "Grouped by vaccine and sorted by the most recent administration." : undefined,
+      title: "Immunizations",
+      type,
     };
   }
 
   return {
     count,
-    type,
-    status,
-    title: "Documents",
+    displayMode: "events",
     emptyMessage: "No document references were found in the current HealthEx bundle.",
     guidance,
     items: sectionResources.map((resource) => ({
       label: pickCodeText(resource.type),
       description: resource.subject?.display,
       metadata: [resource.status, formatDisplayDate(resource.date)].filter(Boolean) as string[],
+      occurrences: buildSingleOccurrenceEvent(resource.date, resource.status),
     })),
+    status,
+    title: "Documents",
+    type,
   };
+}
+
+function buildTab(
+  id: ClinicalTabId,
+  label: string,
+  searchPlaceholder: string,
+  emptyHint: string,
+  items: ClinicalItem[],
+): ClinicalTab {
+  const totalCount = items.reduce((total, item) => total + (item.occurrenceCount ?? 1), 0);
+
+  return {
+    emptyHint,
+    hasData: items.length > 0,
+    id,
+    items,
+    label,
+    searchPlaceholder,
+    totalCount,
+  };
+}
+
+function buildTabs(sections: ClinicalSection[]): ClinicalTab[] {
+  const byType = new Map(sections.map((section) => [section.type, section]));
+  const conditionSection = byType.get("Condition");
+  const medicationSection = byType.get("MedicationRequest");
+  const observationSection = byType.get("Observation");
+  const immunizationSection = byType.get("Immunization");
+
+  const labsItems: ClinicalItem[] = [];
+  const vitalsItems: ClinicalItem[] = [];
+
+  for (const item of observationSection?.items ?? []) {
+    if (classifyObservationItem(item) === "vitals") {
+      vitalsItems.push(item);
+    } else {
+      labsItems.push(item);
+    }
+  }
+
+  return [
+    buildTab(
+      "conditions",
+      "Conditions",
+      "Search conditions",
+      "No structured conditions in the current bundle.",
+      conditionSection?.items ?? [],
+    ),
+    buildTab(
+      "medications",
+      "Medications",
+      "Search medications",
+      "No medication history in the current bundle.",
+      medicationSection?.items ?? [],
+    ),
+    buildTab(
+      "labs",
+      "Labs",
+      "Search lab results",
+      "No lab-style observations in the current bundle.",
+      labsItems,
+    ),
+    buildTab(
+      "vitals",
+      "Vitals",
+      "Search vital signs",
+      "No vital-sign observations in the current bundle.",
+      vitalsItems,
+    ),
+    buildTab(
+      "immunizations",
+      "Immunizations",
+      "Search immunizations",
+      "No immunization history in the current bundle.",
+      immunizationSection?.items ?? [],
+    ),
+  ];
 }
 
 function pickLeadTypes(resourceCounts: Record<string, number>) {
@@ -346,11 +978,11 @@ function buildSummaryNotes(
 
   if (leadTypes.length === 0) {
     notes.push(
-      "The current snapshot does not yet contain any supported structured resource types, so a fresh live browser pull is still needed.",
+      "The current source does not yet contain any supported structured resource types, so a fresher live browser pull may still be needed.",
     );
   } else if (leadTypes.length === 1) {
     notes.push(
-      `The current saved snapshot only validates one clearly usable structured section: ${SUPPORTED_TYPE_LABELS[leadTypes[0]]}.`,
+      `The current source only validates one clearly usable structured section: ${SUPPORTED_TYPE_LABELS[leadTypes[0]]}.`,
     );
   } else {
     notes.push(
@@ -360,12 +992,12 @@ function buildSummaryNotes(
 
   if (binaryCount > supportedResourceTotal) {
     notes.push(
-      "Binary attachments currently outnumber supported structured resources, so this bundle is still document-heavy.",
+      "Binary attachments currently outnumber supported structured resources, so the viewer keeps file-heavy content secondary.",
     );
   }
 
   if ((resourceCounts.Immunization ?? 0) === 0) {
-    notes.push("Immunization data is still unvalidated in the saved snapshot.");
+    notes.push("Immunization data is not yet present in the current bundle.");
   }
 
   return notes;
@@ -416,6 +1048,7 @@ export function buildSummaryFromBundle(
   const sections = SUPPORTED_TYPES.map((type) =>
     buildSection(type, resources, resourceCounts, leadTypes, binaryCount),
   ).sort(sortSections);
+  const tabs = buildTabs(sections);
 
   return {
     binaryCount,
@@ -428,6 +1061,7 @@ export function buildSummaryFromBundle(
     sections,
     sourceFile: options?.sourceFile ?? null,
     supportedResourceTotal,
+    tabs,
   } satisfies HealthExSummary;
 }
 

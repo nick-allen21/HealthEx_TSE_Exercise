@@ -23,6 +23,7 @@ Current assumptions:
   same copied token currently returns `403` from terminal or server-side requests
 - the app therefore treats browser-side live fetch as the primary retrieval path
 - a locally saved bundle under `tmp/healthex-fhir/` is an optional development fallback
+- the live hydrated state is more authoritative than the saved local fallback if the two disagree
 
 Historical note:
 - this repository initially explored a Synthea-based demo-data workflow, but it
@@ -39,13 +40,13 @@ Historical note:
 - `src/lib/healthex-summary.ts`: shared FHIR bundle-to-summary shaping logic
 - `src/lib/local-healthex-bundle.ts`: local snapshot fallback loader
 - `scripts/pull-healthex-record.mjs`: helper script for longer-lived or future server-usable HealthEx credentials
+- `claude-skills/healthex-immunization-gap`: uploadable Claude skill package for immunization-gap review through the HealthEx connector
 - `docs/phase1_foundation.md`: Phase 1 HealthEx access and retrieval foundation
 - `docs/phase2_fhir_queries_shaping.md`: Phase 2 shaping and summary-section handoff
 - `docs/phase3_clinical_history_ui.md`: Phase 3 UI execution notes
-- `docs/phase4_immunization_engine.md`: Phase 4 immunization analysis notes
-- `docs/phase5_claude_skill.md`: Phase 5 Claude/MCP integration notes
-- `docs/phase6_extensions_validation.md`: Phase 6 validation and polish notes
-- `docs/phase7_readme_submission.md`: Phase 7 evaluator-facing documentation notes
+- `docs/phase4_claude_immunization_skill.md`: Phase 4 combined immunization and Claude/MCP notes
+- `docs/phase5_extensions_validation.md`: Phase 5 validation and polish notes
+- `docs/phase6_readme_submission.md`: Phase 6 evaluator-facing documentation notes
 
 ## Setup And Run
 
@@ -95,6 +96,37 @@ This is useful when:
 - you want to iterate on the UI without re-fetching immediately
 - you want a stable local sample during short-lived token windows
 
+Important caveat:
+- the saved fallback can become stale and may underrepresent the richer live browser pull
+
+## Claude Skill
+
+The repo now includes an uploadable Claude skill package at
+`claude-skills/healthex-immunization-gap`.
+
+The skill is designed to sit on top of the HealthEx connector inside Claude and
+is intentionally separate from the browser-token FHIR flow used by the local web
+app.
+
+Reviewer notes:
+
+1. Open the folder and inspect `SKILL.md` plus the `references/` files.
+2. Upload the folder as a custom Claude skill so `SKILL.md` is at the top level
+   of the uploaded directory.
+3. Connect HealthEx in Claude and allow tool access before asking for an
+   immunization-gap review.
+
+Current skill behavior:
+
+- activates for immunization-history, vaccine-gap, overdue-vaccine, catch-up,
+  or corrective-action requests
+- uses `CDC/ACIP` as the clinical recommendation source and `CDC CDSi` as the
+  implementation companion
+- expects live HealthEx connector access and should ask the user to connect
+  HealthEx rather than guessing from incomplete context
+- returns likely current items, likely gaps, corrective actions, assumptions,
+  and a non-clinical disclaimer
+
 ## Technical Notes
 
 - FHIR base URL: `https://api.healthex.io/FHIR/R4`
@@ -111,17 +143,20 @@ This is useful when:
   want for a production integration.
 - Keeping a local bundle fallback improves iteration speed, but it can lag
   behind the live record if it is not refreshed.
-- The latest saved local snapshot is still mostly `Binary` data, so it currently
-  validates `AllergyIntolerance` as the only clearly usable structured lead section.
+- The latest observed live hydrated state is stronger than the saved local snapshot
+  and already surfaces at least two useful structured sections: `Immunization`
+  and `MedicationRequest`.
+- The latest saved local snapshot is still mostly `Binary` data, so it should be
+  treated as a stale fallback rather than the best representation of the current record.
 
 ## With More Time
 
 - replace the temporary copied-token flow with a more durable HealthEx auth path
-- refresh the saved bundle from a fuller live browser pull so a second supported
-  lead section can be validated locally
+- refresh the saved bundle so the local fallback matches the richer live hydrated state
 - clarify the best route for immunization data if it is not reliably exposed in
   the current FHIR response
-- finish the Claude skill and recommendation workflow with the final data shape
+- validate the live HealthEx connector workflow end to end against the shipped
+  skill package
 
 ## Additional Documentation
 
