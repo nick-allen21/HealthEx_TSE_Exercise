@@ -39,9 +39,9 @@ If git worktrees are used, the branch name and the worktree name should be the s
 
 ## Expected Workflow
 
-- Read `IMPLEMENTATION_PLAN.md` before starting work.
+- Read `docs/implementation-plan.md` before starting work.
 - Read the phase document you are responsible for before starting work.
-- An agent should be able to read `IMPLEMENTATION_PLAN.md` and its assigned phase document and become fully up to date.
+- An agent should be able to read `docs/implementation-plan.md` and its assigned phase document and become fully up to date.
 - Bootstrap the local environment before implementation work if dependencies are needed:
   ```bash
   conda env create -f environment.yml
@@ -51,14 +51,14 @@ If git worktrees are used, the branch name and the worktree name should be the s
   ```
 - If the Cursor-integrated shell resolves `node` or `npm` to Cursor's bundled runtime instead of the active Conda environment, prefer the env-local binary directly for validation commands.
 - Check the relevant TODOs, assumptions, and open decisions before making changes.
-- Update `IMPLEMENTATION_PLAN.md` as work progresses so it always reflects the current state of the project.
+- Update `docs/implementation-plan.md` as work progresses so it always reflects the current state of the project.
 - Update the phase document you are responsible for as work progresses.
 - Record important design decisions, TODO status updates, and scope changes as they happen.
 - Keep the work simple, practical, and aligned with the HealthEx assignment.
 
 ## Shared Repository Memory
 
-- Treat `IMPLEMENTATION_PLAN.md` as the living technical source of truth.
+- Treat `docs/implementation-plan.md` as the living technical source of truth.
 - Treat the assigned phase document as the execution and handoff surface for that unit of work.
 - Treat `README.md` as the human-facing entry point for reviewers.
 - Keep both the implementation plan and the assigned phase document current enough that the next agent can continue immediately. The docs should accurately reflect the current state of the world. A agent should be able to read them and and be an expert in this directory.

@@ -98,9 +98,8 @@ so the old `record-chat-dock.tsx` no longer exists.
 - [../claude-skills/healthex-immunization-gap/README.md](../claude-skills/healthex-immunization-gap/README.md)
   gained a `Data Quality Gaps Handled In The Pipeline` section that mirrors
   the three gaps from the skill's perspective.
-- [../IMPLEMENTATION_PLAN.md](../IMPLEMENTATION_PLAN.md) was updated to check
-  off the relevant Phase 5 master TODOs and record three new resolved
-  decisions.
+- [implementation-plan.md](implementation-plan.md) was updated to check off the
+  relevant Phase 5 master TODOs and record three new resolved decisions.
 
 ## Files Touched
 
@@ -117,7 +116,7 @@ Edited:
 - `package.json` (`vitest` devDependency, `test` and `test:watch` scripts)
 - `README.md`
 - `claude-skills/healthex-immunization-gap/README.md`
-- `IMPLEMENTATION_PLAN.md`
+- `docs/implementation-plan.md`
 
 Removed:
 - `src/components/record-chat-dock.tsx` (floating dock, merged into the chart summary)

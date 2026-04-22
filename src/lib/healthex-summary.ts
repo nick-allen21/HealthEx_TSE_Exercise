@@ -1192,7 +1192,11 @@ export function buildSummaryFromBundle(
   bundle: FhirBundle,
   options?: { sourceFile?: string | null; lastPulledLabel?: string },
 ) {
-  // contract: do not filter clinical resources by a single Patient ID - see docs/phase5_extensions_validation.md Gap B.
+  // Contract: never filter clinical resources by a single Patient ID.
+  // HealthEx Person resources can link to multiple Patient identities and
+  // clinical resources attach to either one; filtering would drop half the
+  // record. See docs/phase5_extensions_validation.md (Gap B) for the full
+  // rationale and test coverage.
   const resources = (bundle.entry ?? [])
     .map((entry) => entry.resource)
     .filter((resource): resource is FhirResource => Boolean(resource));

@@ -56,11 +56,11 @@ function decodeJwtPayload(token) {
 }
 
 function getRequiredToken() {
-  const token = process.env.NICK_HEALTHEX_AUTH || process.env.HEALTHEX_ACCESS_TOKEN;
+  const token = process.env.HEALTHEX_ACCESS_TOKEN;
 
   if (!token) {
     throw new Error(
-      "Missing auth token. Set NICK_HEALTHEX_AUTH or HEALTHEX_ACCESS_TOKEN before running this script.",
+      "Missing auth token. Set HEALTHEX_ACCESS_TOKEN before running this script.",
     );
   }
 

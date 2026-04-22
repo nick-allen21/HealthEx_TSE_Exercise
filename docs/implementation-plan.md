@@ -135,7 +135,7 @@ Current phase-doc status:
 
 | Topic | Current decision | Reason |
 |---|---|---|
-| Repository source of truth | `IMPLEMENTATION_PLAN.md` is the living technical source of truth | Keeps project memory in one place |
+| Repository source of truth | `docs/implementation-plan.md` is the living technical source of truth | Keeps project memory in one place |
 | Human entry point | `README.md` is evaluator-facing | Matches the exercise submission context |
 | Phase docs | We will maintain six phase docs in `docs/` as the handoff surface for future work | Keeps multi-agent context explicit |
 | Technical stack | Next.js + TypeScript is the main application stack | Aligns with HealthEx's TypeScript usage and keeps the app simple |
@@ -267,7 +267,7 @@ Current phase-doc status:
 
 ## Handoff Notes For Future Phase Agents
 
-- Start by reading this file, `AGENT_README.md`, and the phase document you are responsible for.
+- Start by reading this file, `docs/agent-readme.md`, and the phase document you are responsible for.
 - Assume the active patient strategy is the repository owner's own HealthEx record unless a user explicitly changes it.
 - Do not revive Synthea or synthetic-demo guidance unless the user explicitly asks for that path again.
 - Prefer updating the current browser-live workflow before adding new infrastructure.
