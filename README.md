@@ -8,6 +8,12 @@ Three deliverables for the HealthEx candidate exercise:
 
 See `HealthEx_TSE_Exercise.md` for the original brief.
 
+The repo also includes the written responses for the communication portion of
+the exercise:
+
+- Task A: `customer_communication/Technical_Explainer.md`
+- Task B: `customer_communication/Customer_Objection.md`
+
 ## Setup And Run
 
 ```bash
