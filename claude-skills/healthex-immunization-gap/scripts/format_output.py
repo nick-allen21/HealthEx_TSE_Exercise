@@ -5,10 +5,18 @@ from __future__ import annotations
 
 import json
 import sys
+from pathlib import Path
 from typing import Dict, List
 
+SKILL_MD_PATH = Path(__file__).resolve().parent.parent / "SKILL.md"
 
-SKILL_VERSION = "1.0.0"
+
+def load_skill_version() -> str:
+    text = SKILL_MD_PATH.read_text()
+    for line in text.splitlines():
+        if line.startswith("version:"):
+            return line.split(":", 1)[1].strip()
+    return "unknown"
 
 
 def _bullet_lines(items: List[str]) -> List[str]:
@@ -17,15 +25,40 @@ def _bullet_lines(items: List[str]) -> List[str]:
     return [f"- {item}" for item in items]
 
 
+def _plain_language_supporting_context(items: List[str]) -> str:
+    mapping = {
+        "get_immunizations": "full immunization history",
+        "get_health_summary": "basic patient context",
+        "get_labs": "lab and titer context",
+        "get_allergies": "allergy context",
+        "get_conditions": "condition context",
+        "get_medications": "medication context",
+        "get_procedures": "procedure context",
+        "get_visits": "visit context",
+        "search": "additional chart detail",
+        "search_clinical_notes": "clinical note context",
+    }
+    labels = []
+    for item in items:
+        labels.append(mapping.get(item, item.replace("_", " ")))
+    deduped = []
+    for label in labels:
+        if label not in deduped:
+            deduped.append(label)
+    return ", ".join(deduped) if deduped else "none beyond immunization history"
+
+
 def format_output(payload: Dict[str, object]) -> str:
     patient = payload.get("patient", {})
     freshness = payload.get("freshness", {})
     normalized = payload.get("normalized", {})
     comparison = payload.get("comparison", {})
     classifications = comparison.get("classifications", [])
+    skill_version = payload.get("skill_version") or load_skill_version()
 
     likely_current = [item for item in classifications if item["status"] == "likely current"]
     potential_gaps = [item for item in classifications if item["status"] != "likely current"]
+    childhood_audit = comparison.get("childhood_audit", [])
 
     quality_flags = []
     summary = normalized.get("summary", {})
@@ -35,6 +68,8 @@ def format_output(payload: Dict[str, object]) -> str:
         quality_flags.append(f"{summary['missing_cvx_records']} record(s) missing CVX")
     if summary.get("unsupported_cvx_records"):
         quality_flags.append(f"{summary['unsupported_cvx_records']} record(s) with CVX outside the bundled public mapping")
+    if summary.get("display_name_inferred_records"):
+        quality_flags.append(f"{summary['display_name_inferred_records']} record(s) were classified from display-name heuristics")
     if summary.get("duplicate_records"):
         quality_flags.append(f"{summary['duplicate_records']} duplicate occurrence/CVX artifact(s) were deduplicated")
     if summary.get("skipped_records"):
@@ -44,6 +79,7 @@ def format_output(payload: Dict[str, object]) -> str:
 
     supporting_tools = payload.get("supporting_tools", [])
     assumptions = payload.get("assumptions", [])
+    degraded_analysis = payload.get("degraded_analysis")
     if summary.get("external_records"):
         assumptions.append("imported records may omit product-level details")
     if freshness.get("is_stale"):
@@ -78,7 +114,12 @@ def format_output(payload: Dict[str, object]) -> str:
                 [
                     f"{summary.get('total_records', 0)} normalized immunization record(s)",
                     f"schedule reference: {comparison.get('schedule_source', 'unknown')} ({comparison.get('schedule_version_date', 'unknown')})",
-                    f"supporting tools used: {', '.join(supporting_tools) if supporting_tools else 'none beyond immunization history'}",
+                    f"additional context reviewed: {_plain_language_supporting_context(supporting_tools)}",
+                    *(
+                        [f"analysis mode: lighter pass used because the full runtime path could not be completed cleanly"]
+                        if degraded_analysis
+                        else []
+                    ),
                 ]
             ),
             "",
@@ -88,6 +129,8 @@ def format_output(payload: Dict[str, object]) -> str:
             "",
             "## 5. Immunizations Likely Current",
             "",
+            "This list reflects the bundled schedule rules only. Clinical judgment and risk context may add or remove items.",
+            "",
         ]
     )
 
@@ -96,6 +139,8 @@ def format_output(payload: Dict[str, object]) -> str:
             lines.append(f"- {item['antigen']}: {item['reason']}")
     else:
         lines.append("- none identified with high confidence")
+    for item in childhood_audit:
+        lines.append(f"- {item['antigen']}: {item['status']} - {item['reason']}")
 
     lines.extend(["", "## 6. Potential Gaps Or Overdue Items", ""])
 
@@ -120,7 +165,7 @@ def format_output(payload: Dict[str, object]) -> str:
             "",
             "A few things to keep in mind: This analysis only includes vaccines in your HealthEx-connected records. Shots given at pharmacies, travel clinics, military sites, or outside this health system may not appear. The recommendation logic is based on the bundled schedule snapshot cited in this answer. This is a summary of your records, not medical advice; confirm any gaps or next steps with your clinician before acting.",
             "",
-            f"immunization-gap-analysis v{SKILL_VERSION} · {comparison.get('schedule_source', 'schedule')} {comparison.get('schedule_version_date', 'unknown')} · synced {freshness.get('last_updated', 'unknown')}",
+            f"immunization-gap-analysis v{skill_version} · {comparison.get('schedule_source', 'schedule')} {comparison.get('schedule_version_date', 'unknown')} · synced {freshness.get('last_updated', 'unknown')}",
         ]
     )
 

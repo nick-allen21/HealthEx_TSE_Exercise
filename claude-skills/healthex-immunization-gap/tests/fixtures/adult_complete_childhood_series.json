@@ -1,0 +1,43 @@
+{
+  "description": "Adult with complete childhood series and a recent influenza shot.",
+  "payload": {
+    "patient": {
+      "dob": "2003-02-01",
+      "data_source": "fixture"
+    },
+    "now": "2026-04-21",
+    "freshness": {
+      "last_updated": "2026-04-21",
+      "is_stale": false,
+      "reconnect_url": "not needed"
+    },
+    "supporting_tools": ["get_immunizations", "get_health_summary"],
+    "immunization_windows": [
+      {
+        "rows": [
+          {"OccurrenceDate": "2003-02-02", "Date": "2003-02-02", "Immunization": "Hepatitis B", "CVX": "08", "PrimarySource": "Yes", "Status": "completed"},
+          {"OccurrenceDate": "2003-03-02", "Date": "2003-03-02", "Immunization": "Hepatitis B", "CVX": "08", "PrimarySource": "Yes", "Status": "completed"},
+          {"OccurrenceDate": "2003-08-02", "Date": "2003-08-02", "Immunization": "Hepatitis B", "CVX": "08", "PrimarySource": "Yes", "Status": "completed"},
+          {"OccurrenceDate": "2004-02-01", "Date": "2004-02-01", "Immunization": "MMR", "CVX": "03", "PrimarySource": "Yes", "Status": "completed"},
+          {"OccurrenceDate": "2008-02-01", "Date": "2008-02-01", "Immunization": "MMR", "CVX": "03", "PrimarySource": "Yes", "Status": "completed"},
+          {"OccurrenceDate": "2004-02-01", "Date": "2004-02-01", "Immunization": "Varicella", "CVX": "21", "PrimarySource": "Yes", "Status": "completed"},
+          {"OccurrenceDate": "2008-02-01", "Date": "2008-02-01", "Immunization": "Varicella", "CVX": "21", "PrimarySource": "Yes", "Status": "completed"},
+          {"OccurrenceDate": "2014-03-01", "Date": "2014-03-01", "Immunization": "HPV9", "CVX": "165", "PrimarySource": "Yes", "Status": "completed"},
+          {"OccurrenceDate": "2014-10-15", "Date": "2014-10-15", "Immunization": "HPV9", "CVX": "165", "PrimarySource": "Yes", "Status": "completed"},
+          {"OccurrenceDate": "2014-09-01", "Date": "2014-09-01", "Immunization": "MenACWY", "CVX": "114", "PrimarySource": "Yes", "Status": "completed"},
+          {"OccurrenceDate": "2019-09-01", "Date": "2019-09-01", "Immunization": "Influenza", "CVX": "150", "PrimarySource": "Yes", "Status": "completed"},
+          {"OccurrenceDate": "2025-10-01", "Date": "2025-10-01", "Immunization": "Influenza", "CVX": "150", "PrimarySource": "Yes", "Status": "completed"}
+        ],
+        "pagination_lines": ["Pagination Info:", "- Requested 3-year window: Fully covered"]
+      }
+    ],
+    "corrective_actions": ["confirm any vaccines received outside connected systems before acting on a gap"]
+  },
+  "expectations": {
+    "contains": [
+      "Influenza: a recent dose appears within the expected annual window",
+      "Hepatitis B: documented childhood series appears complete",
+      "HPV: the documented series satisfies the simplified age-at-first-dose rule"
+    ]
+  }
+}

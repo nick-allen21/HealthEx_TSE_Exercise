@@ -1,0 +1,37 @@
+{
+  "description": "Older records without CVX that should still be classified from display names.",
+  "payload": {
+    "patient": {
+      "dob": "1999-06-01",
+      "data_source": "fixture"
+    },
+    "now": "2026-04-21",
+    "freshness": {
+      "last_updated": "2026-04-21",
+      "is_stale": false,
+      "reconnect_url": "not needed"
+    },
+    "supporting_tools": ["get_immunizations"],
+    "immunization_windows": [
+      {
+        "rows": [
+          {"OccurrenceDate": "2010-06-01", "Date": "2010-06-01", "Immunization": "MMR 2", "CVX": "", "PrimarySource": "Yes", "Status": "completed"},
+          {"OccurrenceDate": "2010-06-01", "Date": "2010-06-01", "Immunization": "Varicella 2", "CVX": "", "PrimarySource": "Yes", "Status": "completed"},
+          {"OccurrenceDate": "2011-09-08", "Date": "2011-09-08", "Immunization": "PPD skin test", "CVX": "", "PrimarySource": "Yes", "Status": "completed"},
+          {"OccurrenceDate": "2018-08-01", "Date": "2018-08-01", "Immunization": "Tdap (Boostrix)", "CVX": "", "PrimarySource": "Yes", "Status": "completed"},
+          {"OccurrenceDate": "2025-09-01", "Date": "2025-09-01", "Immunization": "FluMist", "CVX": "", "PrimarySource": "Yes", "Status": "completed"}
+        ],
+        "pagination_lines": ["Pagination Info:", "- Requested 3-year window: Fully covered"]
+      }
+    ],
+    "corrective_actions": ["verify whether any older outside records are still missing from the chart"]
+  },
+  "expectations": {
+    "contains": [
+      "record(s) were classified from display-name heuristics"
+    ],
+    "not_contains": [
+      "PPD"
+    ]
+  }
+}

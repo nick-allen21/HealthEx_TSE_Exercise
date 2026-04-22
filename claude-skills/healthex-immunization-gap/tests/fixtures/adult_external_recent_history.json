@@ -1,0 +1,32 @@
+{
+  "description": "Adult with mixed primary and imported recent COVID history to test missing-history downgrading.",
+  "payload": {
+    "patient": {
+      "dob": "2003-02-01",
+      "data_source": "fixture"
+    },
+    "now": "2026-04-21",
+    "freshness": {
+      "last_updated": "2026-04-21",
+      "is_stale": false,
+      "reconnect_url": "not needed"
+    },
+    "supporting_tools": ["get_immunizations"],
+    "immunization_windows": [
+      {
+        "rows": [
+          {"OccurrenceDate": "2021-05-01", "Date": "2021-05-01", "Immunization": "COVID-19 Pfizer", "CVX": "208", "PrimarySource": "No", "Status": "completed"},
+          {"OccurrenceDate": "2021-06-01", "Date": "2021-06-01", "Immunization": "COVID-19 Pfizer", "CVX": "217", "PrimarySource": "No", "Status": "completed"},
+          {"OccurrenceDate": "2024-12-12", "Date": "2024-12-12", "Immunization": "COVID-19 Pfizer", "CVX": "309", "PrimarySource": "Yes", "Status": "completed"}
+        ],
+        "pagination_lines": ["Pagination Info:", "- Requested 3-year window: Fully covered"]
+      }
+    ],
+    "corrective_actions": ["verify current seasonal COVID guidance if this question matters right now"]
+  },
+  "expectations": {
+    "contains": [
+      "COVID-19: context required"
+    ]
+  }
+}

@@ -31,6 +31,11 @@
       "antigen_group": "varicella"
     },
     {
+      "cvx": 33,
+      "display_name": "Pneumococcal polysaccharide",
+      "antigen_group": "pcv"
+    },
+    {
       "cvx": 48,
       "display_name": "Hib PRP-T",
       "antigen_group": "hib"
@@ -51,6 +56,11 @@
       "antigen_group": "pcv"
     },
     {
+      "cvx": 101,
+      "display_name": "Typhoid Vi polysaccharide",
+      "antigen_group": "travel-vaccine"
+    },
+    {
       "cvx": 114,
       "display_name": "MenACWY",
       "antigen_group": "menacwy"
@@ -64,6 +74,11 @@
       "cvx": 133,
       "display_name": "PCV13",
       "antigen_group": "pcv"
+    },
+    {
+      "cvx": 111,
+      "display_name": "Influenza live intranasal (legacy)",
+      "antigen_group": "influenza"
     },
     {
       "cvx": 140,
@@ -89,6 +104,16 @@
       "cvx": 165,
       "display_name": "HPV9",
       "antigen_group": "hpv"
+    },
+    {
+      "cvx": 121,
+      "display_name": "Zoster live",
+      "antigen_group": "zoster"
+    },
+    {
+      "cvx": 187,
+      "display_name": "Zoster recombinant",
+      "antigen_group": "zoster"
     },
     {
       "cvx": 208,

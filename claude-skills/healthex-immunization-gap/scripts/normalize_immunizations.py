@@ -8,10 +8,29 @@ import re
 import sys
 from pathlib import Path
 from datetime import datetime
-from typing import Dict, List, Optional, Tuple
+from typing import Dict, List, Optional, Pattern, Tuple
 
 REFERENCE_DIR = Path(__file__).resolve().parent.parent / "references"
 CVX_CODES_PATH = REFERENCE_DIR / "cvx_codes.json"
+
+DISPLAY_NAME_FALLBACKS: List[Tuple[Pattern[str], str, str]] = [
+    (re.compile(r"\bmmr\b", re.I), "mmr", "MMR"),
+    (re.compile(r"varicella|varivax", re.I), "varicella", "Varicella"),
+    (re.compile(r"tdap|boostrix|adacel", re.I), "tdap", "Tdap"),
+    (re.compile(r"\bhpv\b|gardasil", re.I), "hpv", "HPV"),
+    (re.compile(r"hepatitis\s*b|\bhepb\b", re.I), "hepb", "Hepatitis B"),
+    (re.compile(r"hepatitis\s*a|\bhepa\b", re.I), "hepa", "Hepatitis A"),
+    (re.compile(r"\bipv\b|polio", re.I), "ipv", "IPV"),
+    (re.compile(r"flu|influenza|flumist", re.I), "influenza", "Influenza"),
+    (re.compile(r"menactra|menveo|mcv4|menacwy", re.I), "menacwy", "MenACWY"),
+    (re.compile(r"\bmenb\b|bexsero|trumenba", re.I), "menb", "MenB"),
+]
+EXCLUDED_DISPLAY_NAMES: List[Pattern[str]] = [
+    re.compile(r"\bppd\b", re.I),
+    re.compile(r"quantiferon", re.I),
+    re.compile(r"tb skin test", re.I),
+    re.compile(r"tuberculin", re.I),
+]
 
 
 def load_cvx_mappings() -> Dict[str, Dict[str, str]]:
@@ -53,6 +72,21 @@ def _dedupe_key(record: Dict[str, object]) -> Tuple[Optional[str], Optional[str]
     return record.get("occurrence_date"), record.get("cvx")
 
 
+def infer_antigen_from_display_name(display_name: Optional[str]) -> Tuple[Optional[str], Optional[str]]:
+    if not display_name:
+        return None, None
+    for pattern, antigen_group, normalized_display_name in DISPLAY_NAME_FALLBACKS:
+        if pattern.search(display_name):
+            return antigen_group, normalized_display_name
+    return None, None
+
+
+def is_excluded_non_vaccine(display_name: Optional[str]) -> bool:
+    if not display_name:
+        return False
+    return any(pattern.search(display_name) for pattern in EXCLUDED_DISPLAY_NAMES)
+
+
 def normalize_immunization_rows(rows: List[Dict[str, str]]) -> Dict[str, object]:
     cvx_mappings = load_cvx_mappings()
     normalized_rows: List[Dict[str, object]] = []
@@ -61,17 +95,30 @@ def normalize_immunization_rows(rows: List[Dict[str, str]]) -> Dict[str, object]
     seen_by_key: Dict[Tuple[Optional[str], Optional[str]], Dict[str, object]] = {}
 
     for row in rows:
+        display_name = row.get("Immunization") or None
+        if is_excluded_non_vaccine(display_name):
+            skipped.append(
+                {
+                    "reason": "excluded_non_vaccine_record",
+                    "display_name": display_name,
+                    "cvx": canonical_cvx(row.get("CVX", "")),
+                    "raw_row": row,
+                }
+            )
+            continue
+
         occurrence_date = parse_mixed_date(row.get("OccurrenceDate", "")) or parse_mixed_date(row.get("Date", ""))
         cvx = canonical_cvx(row.get("CVX", ""))
         status = (row.get("Status", "") or "").strip().lower()
         primary_source = row.get("PrimarySource") or "No"
         mapping = cvx_mappings.get(cvx or "")
+        inferred_antigen_group, inferred_display_name = infer_antigen_from_display_name(display_name)
 
         if not occurrence_date:
             skipped.append(
                 {
                     "reason": "missing_occurrence_date",
-                    "display_name": row.get("Immunization") or None,
+                    "display_name": display_name,
                     "cvx": cvx,
                     "raw_row": row,
                 }
@@ -83,9 +130,9 @@ def normalize_immunization_rows(rows: List[Dict[str, str]]) -> Dict[str, object]
             "recorded_date": parse_mixed_date(row.get("Date", "")),
             "occurrence_date_source": row.get("OccurDateSource") or None,
             "cvx": cvx,
-            "antigen_group": mapping["antigen_group"] if mapping else "unclassified",
-            "display_name": row.get("Immunization") or (mapping["display_name"] if mapping else None),
-            "normalized_display_name": mapping["display_name"] if mapping else None,
+            "antigen_group": mapping["antigen_group"] if mapping else (inferred_antigen_group or "unclassified"),
+            "display_name": display_name or (mapping["display_name"] if mapping else inferred_display_name),
+            "normalized_display_name": mapping["display_name"] if mapping else inferred_display_name,
             "status": status or None,
             "status_reason": row.get("StatusReason") or None,
             "primary_source": primary_source,
@@ -109,6 +156,8 @@ def normalize_immunization_rows(rows: List[Dict[str, str]]) -> Dict[str, object]
             normalized["quality_flags"].append("missing_cvx")
         elif not mapping:
             normalized["quality_flags"].append("unsupported_cvx")
+        if inferred_antigen_group and not mapping:
+            normalized["quality_flags"].append("display_name_inferred_antigen")
         if row.get("PrimarySource") in ("", None):
             normalized["quality_flags"].append("missing_primary_source_assumed_external")
         if normalized["primary_source"] == "No":
@@ -150,6 +199,7 @@ def normalize_immunization_rows(rows: List[Dict[str, str]]) -> Dict[str, object]
             "external_records": sum(1 for row in normalized_rows if "external_record" in row["quality_flags"]),
             "missing_cvx_records": sum(1 for row in normalized_rows if "missing_cvx" in row["quality_flags"]),
             "unsupported_cvx_records": sum(1 for row in normalized_rows if "unsupported_cvx" in row["quality_flags"]),
+            "display_name_inferred_records": sum(1 for row in normalized_rows if "display_name_inferred_antigen" in row["quality_flags"]),
         },
     }
 

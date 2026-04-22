@@ -1,5 +1,14 @@
 # Changelog
 
+## 1.1.0 - 2026-04-21
+
+- added a one-call orchestrator via `scripts/run_analysis.py`
+- added automatic titer parsing via `scripts/parse_titers.py`
+- improved missing-CVX handling with display-name fallback heuristics
+- excluded obvious non-vaccine screening rows from immunization analysis
+- expanded schedule usefulness for adult reviews and added childhood-series credit
+- added smoke-test fixtures and a testing guide for iterative live runs
+
 ## 1.0.0 - 2026-04-21
 
 - prepared the skill package for public self-install distribution

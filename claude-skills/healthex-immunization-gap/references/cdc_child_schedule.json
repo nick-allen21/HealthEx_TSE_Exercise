@@ -97,9 +97,13 @@
       "cvx_codes": [165],
       "ages": "Preteen through young adult",
       "logic": {
-        "type": "context_required"
+        "type": "dose_count_by_age_at_first_dose",
+        "age_threshold_years": 15,
+        "required_doses_before_threshold": 2,
+        "required_doses_after_threshold": 3,
+        "min_months_between_first_last": 5
       },
-      "notes": "2-dose vs 3-dose logic depends on age at series initiation and immune status."
+      "notes": "Simplified age-at-first-dose rule for HPV series completion."
     },
     {
       "antigen": "MenACWY",
@@ -129,10 +133,10 @@
       "cvx_codes": [208, 217, 309],
       "ages": "Age-specific seasonal review",
       "logic": {
-        "type": "annual",
-        "interval_years": 1
+        "type": "context_required",
+        "context_prompt": "pediatric COVID recommendations depend on current seasonal guidance, age, and prior series context"
       },
-      "notes": "Simplified seasonal review. Verify age-specific CDC guidance for the current season."
+      "notes": "Use a season-aware contextual read rather than a hard annual gap."
     }
   ]
 }

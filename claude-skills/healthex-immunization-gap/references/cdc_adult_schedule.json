@@ -22,10 +22,10 @@
       "cvx_codes": [208, 217, 309],
       "ages": "19 years and older",
       "logic": {
-        "type": "annual",
-        "interval_years": 1
+        "type": "context_required",
+        "context_prompt": "current COVID recommendations depend on the current season, age, prior doses, and risk context; review current CDC season guidance before treating this as a hard gap"
       },
-      "notes": "Simplified seasonal review for public skill use. Verify current season-specific CDC guidance."
+      "notes": "Use a nuanced, season-aware review instead of a hard annual gap."
     },
     {
       "antigen": "Tdap or Td booster",
@@ -65,9 +65,10 @@
       "cvx_codes": [8],
       "ages": "Adults with age- and risk-based recommendation differences",
       "logic": {
-        "type": "context_required"
+        "type": "dose_count_with_titer",
+        "required_doses": 3
       },
-      "notes": "Use supporting context and current CDC guidance because recommendation strength varies by age and risk profile."
+      "notes": "Treat a documented 3-dose series or supportive immunity titer as likely current in the simplified public skill."
     },
     {
       "antigen": "HPV",
@@ -75,9 +76,13 @@
       "cvx_codes": [165],
       "ages": "Adults with age-based recommendation differences",
       "logic": {
-        "type": "context_required"
+        "type": "dose_count_by_age_at_first_dose",
+        "age_threshold_years": 15,
+        "required_doses_before_threshold": 2,
+        "required_doses_after_threshold": 3,
+        "min_months_between_first_last": 5
       },
-      "notes": "Routine and shared decision-making recommendations vary by age and prior series history."
+      "notes": "Simplified age-at-first-dose rule for public skill use."
     },
     {
       "antigen": "MenACWY",
@@ -85,9 +90,12 @@
       "cvx_codes": [114],
       "ages": "Risk-based adult recommendation",
       "logic": {
-        "type": "context_required"
+        "type": "adolescent_series_credit",
+        "required_doses": 2,
+        "booster_age_years": 16,
+        "context_prompt": "meningococcal ACWY recommendations depend on travel, college, military, or other risk context when adolescent completion is not already documented"
       },
-      "notes": "Use only when travel, college, military, or other risk context is present."
+      "notes": "Credit a simplified adolescent completion pattern when clearly documented."
     },
     {
       "antigen": "MenB",
@@ -95,9 +103,70 @@
       "cvx_codes": [163],
       "ages": "Risk-based adult recommendation",
       "logic": {
-        "type": "context_required"
+        "type": "series_with_recency_or_not_routinely_indicated",
+        "required_doses": 2,
+        "recency_years": 5,
+        "context_prompt": "MenB is not routinely indicated for every adult; when risk context is absent, treat this as context-dependent rather than a hard gap"
       },
-      "notes": "Use only when age/risk context supports review."
+      "notes": "Use a context-dependent read rather than a blanket due/not-due classification."
+    },
+    {
+      "antigen": "Hepatitis A",
+      "antigen_group": "hepa",
+      "cvx_codes": [83],
+      "ages": "Travel- and risk-based adult recommendation",
+      "logic": {
+        "type": "context_required",
+        "context_prompt": "Hepatitis A is often travel- or exposure-driven in adults; ask about travel, risk, or prior documentation before treating it as a gap"
+      },
+      "notes": "Include for broader public coverage but keep it context-dependent."
+    },
+    {
+      "antigen": "IPV",
+      "antigen_group": "ipv",
+      "cvx_codes": [10],
+      "ages": "Travel- and risk-based adult recommendation",
+      "logic": {
+        "type": "context_required",
+        "context_prompt": "adult IPV booster decisions are usually travel- or exposure-dependent; ask for that context before labeling a gap"
+      },
+      "notes": "Most adult IPV questions are travel-context questions."
+    },
+    {
+      "antigen": "Pneumococcal",
+      "antigen_group": "pcv",
+      "cvx_codes": [100, 133],
+      "ages": "Age 50 and older or risk-based younger adults",
+      "min_age": 50,
+      "logic": {
+        "type": "context_required",
+        "context_prompt": "pneumococcal recommendations depend on age and risk profile; ask about those factors before treating this as a hard gap"
+      },
+      "notes": "Age-gated adult antigen for broader public users."
+    },
+    {
+      "antigen": "Zoster",
+      "antigen_group": "zoster",
+      "cvx_codes": [],
+      "ages": "Age 50 and older",
+      "min_age": 50,
+      "logic": {
+        "type": "context_required",
+        "context_prompt": "zoster recommendations are age-gated and product-specific; ask whether the patient has documented zoster vaccination history before labeling a gap"
+      },
+      "notes": "Included as an age-gated adult antigen even though the current CVX map does not yet cover shingles products."
+    },
+    {
+      "antigen": "RSV",
+      "antigen_group": "rsv",
+      "cvx_codes": [],
+      "ages": "Age 50 and older or older-adult shared decision-making contexts",
+      "min_age": 50,
+      "logic": {
+        "type": "context_required",
+        "context_prompt": "RSV recommendations depend on age band and current season guidance; ask for age and current clinician guidance context before labeling a gap"
+      },
+      "notes": "Included as an age-gated adult antigen for broader public users."
     }
   ]
 }

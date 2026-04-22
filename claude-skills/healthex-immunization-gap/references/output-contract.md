@@ -9,7 +9,7 @@ State the patient context used for the review:
 - age or age band if available
 - whether the review is based on live HealthEx connector data or a user-supplied
   fallback summary
-- whether a full paginated history pull was completed
+- whether the review reflects a full or lighter history pass
 - any major missing context that affects certainty
 
 ## 2. Record Freshness
@@ -24,14 +24,15 @@ State:
 
 Briefly describe what evidence was reviewed:
 
-- immunization records available in HealthEx
-- whether the immunization review was based on paginated `get_immunizations`
-  output, `search` fallback data, or both
-- other supporting chart context if it materially affects the analysis
-  (`get_labs`, `get_allergies`, `get_conditions`, `get_medications`,
-  `get_procedures`, `get_visits`)
+- immunization history available through HealthEx
+- whether the review reflects a full history pull or a lighter pass
+- any additional chart context that materially affected the answer, such as lab,
+  allergy, condition, medication, procedure, or visit context
 - obvious data gaps, such as no immunization history, sparse timeline coverage,
   or conflicting entries
+
+Do not describe connector mechanics, tool names, or execution steps in this
+section.
 
 ## 4. Data Quality Flags
 
@@ -61,10 +62,14 @@ Use one of these labels:
 - `likely current`
 - `likely due`
 - `possibly due pending missing history`
+- `context required`
 - `unable to determine from available record`
 
 If titers materially affect the answer, say so here rather than burying it in
 assumptions.
+
+If the answer depends on missing context rather than missing data, prefer
+`context required` over `unable to determine from available record`.
 
 ## 7. Corrective Actions To Consider
 
@@ -104,3 +109,6 @@ Then add a one-line footer with:
 - skill version
 - bundled schedule source and `version_date`
 - HealthEx sync date
+
+Do not add tool-call narration, retry commentary, or execution summaries before
+or after the numbered sections.

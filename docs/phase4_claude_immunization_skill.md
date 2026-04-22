@@ -43,6 +43,10 @@ integration work into one phase.
 - the public-facing skill name is `immunization-gap-analysis` at version `1.0.0`
 - the public release artifact is a ZIP rooted as `immunization-gap-analysis/`
   even though the repo source folder remains under `claude-skills/`
+- the v1.1 reliability pass should prefer a single orchestrator script over
+  multiple separate runtime invocations
+- the v1.1 reliability pass should parse titers automatically instead of
+  requiring manual lab interpretation
 
 ## Current Package Shape
 
@@ -54,6 +58,8 @@ The current skill package lives at:
 - `claude-skills/healthex-immunization-gap/scripts/normalize_immunizations.py`
 - `claude-skills/healthex-immunization-gap/scripts/parse_summary.py`
 - `claude-skills/healthex-immunization-gap/scripts/parse_flat_fhir.py`
+- `claude-skills/healthex-immunization-gap/scripts/parse_titers.py`
+- `claude-skills/healthex-immunization-gap/scripts/run_analysis.py`
 - `claude-skills/healthex-immunization-gap/scripts/compare_schedule.py`
 - `claude-skills/healthex-immunization-gap/scripts/format_output.py`
 - `claude-skills/healthex-immunization-gap/references/cdc-acip-scope.md`
@@ -68,6 +74,8 @@ The current skill package lives at:
 - `claude-skills/healthex-immunization-gap/references/limitations-and-disclaimer.md`
 - `claude-skills/healthex-immunization-gap/CHANGELOG.md`
 - `claude-skills/healthex-immunization-gap/README.md`
+- `claude-skills/healthex-immunization-gap/TESTING.md`
+- `claude-skills/healthex-immunization-gap/tests/fixtures/`
 - `releases/immunization-gap-analysis-v1.0.0.zip`
 
 ## Trigger And Workflow Direction
@@ -98,6 +106,8 @@ When triggered, the skill should:
 8. compare the available record to CDC/ACIP guidance
 9. return freshness, data-quality flags, likely current items, potential gaps,
    corrective actions, assumptions, and a non-clinical disclaimer
+10. fall back gracefully when tool-call budget prevents a full deep-history run,
+    instead of silently pretending the full scripted pipeline completed
 
 ## Current Limitations
 
@@ -111,6 +121,8 @@ When triggered, the skill should:
   production forecasting engine
 - public-distribution readiness still depends on live validation against
   disconnected, stale, and known-good HealthEx test cases
+- adult schedule coverage is improving, but some risk-based or season-specific
+  questions still intentionally resolve to `context required`
 
 ## Expected Outputs
 
