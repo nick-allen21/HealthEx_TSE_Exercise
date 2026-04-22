@@ -94,7 +94,7 @@ so the old `record-chat-dock.tsx` no longer exists.
 ### 4. Documentation sweep
 
 - Top-level [../README.md](../README.md) gained a `Data Quality Findings`
-  section, a `Running Tests` section, and a `Select-to-Chat` feature blurb.
+  section, a `Running Tests` section, and a chart-as-chat feature blurb.
 - [../claude-skills/healthex-immunization-gap/README.md](../claude-skills/healthex-immunization-gap/README.md)
   gained a `Data Quality Gaps Handled In The Pipeline` section that mirrors
   the three gaps from the skill's perspective.

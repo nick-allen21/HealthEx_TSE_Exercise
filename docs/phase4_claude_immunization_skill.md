@@ -40,7 +40,7 @@ integration work into one phase.
   comparison fields
 - the skill should run a freshness check with
   `update_and_check_recent_records` at entry
-- the public-facing skill name is `immunization-gap-analysis` at version `1.0.0`
+- the public-facing skill name is `immunization-gap-analysis` at version `1.1.0`
 - the public release artifact is a ZIP rooted as `immunization-gap-analysis/`
   even though the repo source folder remains under `claude-skills/`
 - the v1.1 reliability pass should prefer a single orchestrator script over
@@ -76,7 +76,7 @@ The current skill package lives at:
 - `claude-skills/healthex-immunization-gap/README.md`
 - `claude-skills/healthex-immunization-gap/TESTING.md`
 - `claude-skills/healthex-immunization-gap/tests/fixtures/`
-- `releases/immunization-gap-analysis-v1.0.0.zip`
+- `releases/immunization-gap-analysis-v1.1.0.zip`
 
 ## Trigger And Workflow Direction
 
@@ -108,6 +108,32 @@ When triggered, the skill should:
    corrective actions, assumptions, and a non-clinical disclaimer
 10. fall back gracefully when tool-call budget prevents a full deep-history run,
     instead of silently pretending the full scripted pipeline completed
+
+## Latest Iteration Notes
+
+The latest skill iteration tightened response discipline after live testing:
+
+- `scripts/run_analysis.py` now defaults to returning `final_output` only, with
+  checkpoints behind an opt-in debug flag
+- `SKILL.md` now explicitly tells Claude to return one final formatted answer
+  block and not narrate tool usage, retries, or checkpoints
+- `references/output-contract.md` was rewritten to favor user-facing phrasing
+  over raw tool names
+- `TESTING.md` now includes anti-leakage prompts such as "reply only in the
+  standard numbered sections and footer"
+
+## Current Live-Test Readout
+
+The latest live runs show:
+
+- substantive immunization reasoning is now strong enough for submission
+- broad answers usually follow the numbered output sections
+- narrow answers can still drift into a hand-written prose style
+- some runs still leak internal terms like tool names, field names, or runtime
+  choices into the final answer
+
+That means the remaining work is primarily output-discipline polish rather than
+core immunization-logic redesign.
 
 ## Current Limitations
 

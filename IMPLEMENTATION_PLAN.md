@@ -49,12 +49,12 @@ Historical note:
 - [x] Transform the data into a readable health summary
 - [x] Avoid showing raw JSON as the main user experience
 - [x] Build a working Web UI for the clinical history view
-- [ ] Build a Claude skill that uses the HealthEx MCP server
-- [ ] Evaluate immunization history across all time
-- [ ] Compare immunization history against an accredited schedule source
-- [ ] Produce a corrective action plan for missing or overdue immunizations
-- [ ] Write setup and run instructions in `README.md`
-- [ ] Document key tradeoffs and what we would do with more time
+- [x] Build a Claude skill that uses the HealthEx MCP server
+- [x] Evaluate immunization history across all time
+- [x] Compare immunization history against an accredited schedule source
+- [x] Produce a corrective action plan for missing or overdue immunizations
+- [x] Write setup and run instructions in `README.md`
+- [x] Document key tradeoffs and what we would do with more time
 
 ### Committed extension goals
 
@@ -98,9 +98,9 @@ Current phase-doc status:
 - `docs/phase1_foundation.md`: rewritten to cover HealthEx access and retrieval foundation
 - `docs/phase2_fhir_queries_shaping.md`: active shaping and summary-section handoff
 - `docs/phase3_clinical_history_ui.md`: completed reviewer-facing chart shell, fallback decisions, grouped-summary presentation, streaming summary direction, final compact single-column review cleanup, per-section search / in-card expansion pass, the flat-tab restructure that drops Documents and Allergies, exposes a per-tab search input, and adds inline item-level sparkline / date-timeline expansion, and the chart polish + classification pass (non-clipping y-axis with a single unit caption, no value list under a chart, category-first vital/lab classification, UCUM unit prettifier, stronger narrative filter, immunization dose grouping, same-day medication dedupe, and an MCP-injection-safe `suppressHydrationWarning` on the root layout), plus a live-data verification pass and an immunization display-label tie-break that prefers a non-numeric variant when one is available
-- `docs/phase4_claude_immunization_skill.md`: active skill-package, recommendation-source, and Claude/MCP workflow handoff
+- `docs/phase4_claude_immunization_skill.md`: active skill-package, recommendation-source, Claude/MCP workflow, and latest live-test handoff
 - `docs/phase5_extensions_validation.md`: delivers three HealthEx API-side data-quality gap handlers (sentinel allergies, multi-Patient identity reconciliation, CVX-first immunization grouping), three targeted vitest tests for those handlers, and the chart-as-chat AI extension (opening summary streams as the first turn of a grounded conversation, records are pinned via double-click, and follow-ups stream from `/api/record-chat`)
-- `docs/phase6_readme_submission.md`: reserved for evaluator-facing packaging
+- `docs/phase6_readme_submission.md`: active reviewer-facing packaging and submission notes
 
 ## Architecture Assumptions And Constraints
 
@@ -163,7 +163,7 @@ Current phase-doc status:
 | Token automation | Keep manual paste flow for now, or add a browser-side developer bridge later | Manual paste works today; auth automation can wait |
 | First emphasized resource types | Lead with whatever two resource types are best populated in the real record | Must satisfy the assignment while staying readable |
 | Immunization source quality | Use direct FHIR `Immunization` if available, or document limitations if it remains sparse | Needs validation against the real patient bundle |
-| Exact HealthEx MCP flow inside Claude | Confirm the precise connector/tool sequence needed to access the current patient record | The shipped skill now encodes the documented tool flow, but live tool behavior still needs end-to-end validation |
+| Exact HealthEx MCP flow inside Claude | Keep validating the precise connector/tool sequence and answer-shaping behavior in real Claude runs | The shipped skill now encodes the documented tool flow, but live behavior still needs iteration around output discipline and narrow-question handling |
 
 ## Proposed Technical Direction
 
@@ -199,6 +199,7 @@ Current phase-doc status:
 - Treat `get_immunizations` as the primary immunization source, `update_and_check_recent_records` as the freshness gate, and `get_labs` as the first extension path for titer-aware questions.
 - Bundle machine-readable CDC and ECDC schedule snapshots plus CVX mapping data for public distribution.
 - Keep the runtime path compact: one orchestrator call should be preferred over several chained script calls when possible.
+- Keep iterating on user-facing answer discipline so the shipped skill consistently returns one clean formatted answer with minimal runtime leakage.
 
 ## Master TODOs
 
@@ -236,7 +237,7 @@ Current phase-doc status:
 - [x] Add HealthEx-format parsing and normalization helpers to the skill package
 - [x] Add versioning, changelog, license, and release ZIP packaging for self-install distribution
 - [x] Add orchestrated runtime and fixture-backed smoke tests for the skill package
-- [ ] Validate that the skill can identify gaps and produce a corrective schedule
+- [x] Validate that the skill can identify gaps and produce a corrective schedule
 
 ### 5. Validation and polish
 
@@ -249,10 +250,10 @@ Current phase-doc status:
 
 ### 6. Evaluator-facing documentation
 
-- [ ] Keep `README.md` current as the implementation changes
-- [ ] Document setup and run instructions
-- [ ] Document key tradeoffs
-- [ ] Document what we would do differently with more time
+- [x] Keep `README.md` current as the implementation changes
+- [x] Document setup and run instructions
+- [x] Document key tradeoffs
+- [x] Document what we would do differently with more time
 
 ## Risks And Unknowns
 

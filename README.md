@@ -209,8 +209,18 @@ Current skill behavior:
   free-text vaccine label
 - conditionally pulls `get_labs` for titer-aware immunity questions and other
   HealthEx tools only when context requires them
+- prefers the single `run_analysis.py` orchestrator so parsing, normalization,
+  comparison, and formatting happen in one runtime path
+- includes fixture-backed smoke tests and a testing guide for live follow-up
+  runs under `claude-skills/healthex-immunization-gap/TESTING.md`
 - returns freshness, data-quality flags, likely current items, likely gaps,
   corrective actions, assumptions, and a non-clinical disclaimer
+
+Known limitation:
+
+- the broad immunization answers are now substantively strong, but narrow
+  question formatting and occasional internal runtime leakage still need polish
+  in some live Claude runs
 
 ## Technical Notes
 
