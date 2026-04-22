@@ -14,6 +14,11 @@ import {
   type FhirBundle,
   type HealthExSummary,
 } from "@/lib/healthex-summary";
+import {
+  RecordSelectionProvider,
+  selectionKey,
+  useRecordSelection,
+} from "@/lib/record-selection";
 
 type LiveHealthExViewerProps = {
   fallbackSummary: HealthExSummary | null;
@@ -369,13 +374,16 @@ function summarizeNumericSeries(points: SparklinePoint[]) {
   };
 }
 
-function renderItem(
-  item: ClinicalItem,
-  key: string,
-  expanded: boolean,
-  onToggle: () => void,
-  tabId: ClinicalTabId,
-) {
+type RenderItemContext = {
+  expanded: boolean;
+  isPinned: boolean;
+  onToggle: () => void;
+  onTogglePin: () => void;
+  tabId: ClinicalTabId;
+};
+
+function renderItem(item: ClinicalItem, key: string, context: RenderItemContext) {
+  const { expanded, isPinned, onToggle, onTogglePin, tabId } = context;
   const occurrenceCount = item.occurrenceCount ?? item.occurrences.length ?? 1;
   const isRollup = item.presentation === "rollup" || occurrenceCount > 1;
   const numericPoints: SparklinePoint[] = getNumericOccurrences(item.occurrences).map(
@@ -408,10 +416,18 @@ function renderItem(
   }
 
   return (
-    <li key={key} className={`item-row ${expanded ? "item-row-expanded" : ""}`}>
+    <li
+      key={key}
+      className={`item-row ${expanded ? "item-row-expanded" : ""} ${isPinned ? "item-row-pinned" : ""}`}
+      onDoubleClick={onTogglePin}
+      title={isPinned ? "Pinned to chat. Double-click to unpin." : "Double-click to pin to chat context."}
+    >
       <button type="button" className="item-row-head" onClick={onToggle} aria-expanded={expanded}>
         <span className="item-row-label">
-          <span className="item-row-title">{item.label}</span>
+          <span className="item-row-title">
+            {item.label}
+            {isPinned ? <span className="item-row-pin-dot" aria-label="Pinned to chat" /> : null}
+          </span>
           {summaryBits.length > 0 ? (
             <span className="item-row-summary">{summaryBits.join(" · ")}</span>
           ) : null}
@@ -475,7 +491,16 @@ function renderItem(
   );
 }
 
-export function LiveHealthExViewer({ fallbackSummary }: LiveHealthExViewerProps) {
+export function LiveHealthExViewer(props: LiveHealthExViewerProps) {
+  return (
+    <RecordSelectionProvider>
+      <LiveHealthExViewerInner {...props} />
+    </RecordSelectionProvider>
+  );
+}
+
+function LiveHealthExViewerInner({ fallbackSummary }: LiveHealthExViewerProps) {
+  const selection = useRecordSelection();
   const [token, setToken] = useState("");
   const [personId, setPersonId] = useState("");
   const [fetchState, setFetchState] = useState<FetchState>({ status: "idle" });
@@ -665,19 +690,28 @@ export function LiveHealthExViewer({ fallbackSummary }: LiveHealthExViewerProps)
               ) : filteredItems.length === 0 ? (
                 <p className="empty-state tab-empty">No matches for that search.</p>
               ) : (
-                <ul className="item-list">
-                  {filteredItems.map((item, index) => {
-                    const itemKey = `${activeTabKey}:${item.label}:${index}`;
+                <>
+                  {selection.pinnedCount === 0 ? (
+                    <p className="tab-pin-hint">
+                      Double-click a record to pin it to the chart conversation.
+                    </p>
+                  ) : null}
+                  <ul className="item-list">
+                    {filteredItems.map((item, index) => {
+                      const itemKey = `${activeTabKey}:${item.label}:${index}`;
+                      const pinKey = selectionKey(activeTab.id, item);
+                      const pinned = selection.isPinned(pinKey);
 
-                    return renderItem(
-                      item,
-                      itemKey,
-                      Boolean(expandedItems[itemKey]),
-                      () => toggleItem(itemKey),
-                      activeTab.id,
-                    );
-                  })}
-                </ul>
+                      return renderItem(item, itemKey, {
+                        expanded: Boolean(expandedItems[itemKey]),
+                        isPinned: pinned,
+                        onToggle: () => toggleItem(itemKey),
+                        onTogglePin: () => selection.togglePin(item, activeTab.id, activeTab.label),
+                        tabId: activeTab.id,
+                      });
+                    })}
+                  </ul>
+                </>
               )}
             </section>
           ) : null}

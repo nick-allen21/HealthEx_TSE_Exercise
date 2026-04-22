@@ -61,9 +61,9 @@ Historical note:
 We still intend to complete the stretch items from the brief if they materially
 improve the submission.
 
-- [ ] Surface at least one data quality or completeness issue and explain how it should be handled in production
-- [ ] Add a focused unit test or two for the most critical logic
-- [ ] Add at least one creative AI skill extension or experiment that materially improves the demo
+- [x] Surface at least one data quality or completeness issue and explain how it should be handled in production
+- [x] Add a focused unit test or two for the most critical logic
+- [x] Add at least one creative AI skill extension or experiment that materially improves the demo
 
 ## Validated Findings
 
@@ -99,7 +99,7 @@ Current phase-doc status:
 - `docs/phase2_fhir_queries_shaping.md`: active shaping and summary-section handoff
 - `docs/phase3_clinical_history_ui.md`: completed reviewer-facing chart shell, fallback decisions, grouped-summary presentation, streaming summary direction, final compact single-column review cleanup, per-section search / in-card expansion pass, the flat-tab restructure that drops Documents and Allergies, exposes a per-tab search input, and adds inline item-level sparkline / date-timeline expansion, and the chart polish + classification pass (non-clipping y-axis with a single unit caption, no value list under a chart, category-first vital/lab classification, UCUM unit prettifier, stronger narrative filter, immunization dose grouping, same-day medication dedupe, and an MCP-injection-safe `suppressHydrationWarning` on the root layout), plus a live-data verification pass and an immunization display-label tie-break that prefers a non-numeric variant when one is available
 - `docs/phase4_claude_immunization_skill.md`: active skill-package, recommendation-source, and Claude/MCP workflow handoff
-- `docs/phase5_extensions_validation.md`: reserved for validation and polish
+- `docs/phase5_extensions_validation.md`: delivers three HealthEx API-side data-quality gap handlers (sentinel allergies, multi-Patient identity reconciliation, CVX-first immunization grouping), three targeted vitest tests for those handlers, and the select-to-chat AI extension with a streaming `record-chat` API
 - `docs/phase6_readme_submission.md`: reserved for evaluator-facing packaging
 
 ## Architecture Assumptions And Constraints
@@ -150,6 +150,11 @@ Current phase-doc status:
 | Skill input contract | Expect live HealthEx connector access and ask the user to connect HealthEx if tool access is unavailable | Keeps the skill grounded in record evidence rather than guesswork |
 | Skill engine shape | Use a hybrid skill package: strong workflow instructions plus bundled parser/normalizer helper scripts | Matches the HealthEx connector's real output formats and reduces brittle prompt-only parsing |
 | Public distribution shape | Keep the source skill in `claude-skills/healthex-immunization-gap/` and ship a release ZIP rooted as `immunization-gap-analysis/` | Preserves repo context while giving public users a clean installable artifact |
+| Reliability pass shape | Prefer a single orchestrator script plus fixture-backed smoke tests for the skill runtime | Reduces tool-call overhead and makes feedback-driven iteration safer |
+| Sentinel allergy handling | Suppress SNOMED 716186003 / 409137002 / 429625007 in the shaping layer and surface the count on `dataQualityFlags.sentinelAllergiesSuppressed` | Prevents "No known allergy" records from rendering as active, confirmed findings for any consumer of `HealthExSummary` |
+| Multi-Patient identity reconciliation | Keep every clinical resource regardless of which Patient identity it was filed under, and expose the reconciled set as `summary.patientIdentities` with a no-filter contract comment in `buildSummaryFromBundle` | HealthEx Person records link to multiple Patient identities; filtering by one ID silently drops half of a real patient record |
+| CVX-first immunization grouping | Group Immunization resources by CVX code first, fall back to normalized label only when CVX is absent, and expose the shared CVX on `item.metadata` | Free-text `vaccineCode.text` drifts across doses of the same antigen; grouping by label over-counts distinct vaccines and under-counts doses |
+| Select-to-chat extension shape | Ship a floating pin + multi-turn streaming chat dock grounded only in user-selected records, through `src/app/api/record-chat/route.ts` and `src/lib/record-selection.ts` | Keeps the AI augmentation scoped, auditable, and useful on real heterogeneous bundles without requiring a general-purpose assistant panel |
 
 ### Open Decisions
 
@@ -193,6 +198,7 @@ Current phase-doc status:
 - Keep the uploadable skill package in `claude-skills/healthex-immunization-gap/`.
 - Treat `get_immunizations` as the primary immunization source, `update_and_check_recent_records` as the freshness gate, and `get_labs` as the first extension path for titer-aware questions.
 - Bundle machine-readable CDC and ECDC schedule snapshots plus CVX mapping data for public distribution.
+- Keep the runtime path compact: one orchestrator call should be preferred over several chained script calls when possible.
 
 ## Master TODOs
 
@@ -229,12 +235,15 @@ Current phase-doc status:
 - [x] Define what context the skill needs as input
 - [x] Add HealthEx-format parsing and normalization helpers to the skill package
 - [x] Add versioning, changelog, license, and release ZIP packaging for self-install distribution
+- [x] Add orchestrated runtime and fixture-backed smoke tests for the skill package
 - [ ] Validate that the skill can identify gaps and produce a corrective schedule
 
 ### 5. Validation and polish
 
-- [ ] Identify the most critical logic worth testing
-- [ ] Add focused tests only where they materially reduce risk
+- [x] Identify the most critical logic worth testing
+- [x] Add focused tests only where they materially reduce risk
+- [x] Surface the three HealthEx API-side data-quality gaps we handle in code (sentinel allergies, multi-Patient identity reconciliation, CVX-first immunization grouping)
+- [x] Ship the creative AI extension (select-to-chat dock grounded only on pinned records)
 - [ ] Verify the main technical flow end-to-end with the live browser-token path
 - [ ] Confirm the UI is readable with real patient data
 

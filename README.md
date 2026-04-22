@@ -12,7 +12,7 @@ get a corrective-action plan grounded in the user's available record history.
 
 ## Install
 
-1. Download `releases/immunization-gap-analysis-v1.0.0.zip`.
+1. Download `releases/immunization-gap-analysis-v1.1.0.zip`.
 2. In Claude, go to `Customize -> Skills -> + Create skill` and upload the ZIP.
 3. Enable the skill, then confirm the HealthEx connector is connected under
    `Settings -> Connectors -> HealthEx`.
@@ -44,7 +44,7 @@ Corrective actions to consider
 - discuss indicated vaccination with a clinician or pharmacist
 - verify whether any recent vaccines are missing from stale or unsynced records
 
-immunization-gap-analysis v1.0.0 · CDC Recommended Adult Immunization Schedule 2026-04-21 · synced 2026-04-21
+immunization-gap-analysis v1.1.0 · CDC Recommended Adult Immunization Schedule 2026-04-21 · synced 2026-04-21
 ```
 
 ## Medical Disclaimer
@@ -69,7 +69,7 @@ repo-level disclaimer.
 
 ## Releases And Versioning
 
-- public ZIP: `releases/immunization-gap-analysis-v1.0.0.zip`
+- public ZIP: `releases/immunization-gap-analysis-v1.1.0.zip`
 - skill changelog: `claude-skills/healthex-immunization-gap/CHANGELOG.md`
 - source package: `claude-skills/healthex-immunization-gap`
 
@@ -220,6 +220,105 @@ Current skill behavior:
 - Current summary behavior: automatically ranks up to two supported lead sections from the active bundle and flags document-heavy snapshots
 - Current token limitation: copied patient tokens work in the browser runtime but
   currently return `403` from terminal and server-side requests in this repo
+
+## Data Quality Findings
+
+Real HealthEx responses carry three kinds of ambiguity that any integrator has to
+handle before their product can trust the record. Phase 5 ships a surgical fix
+plus a targeted unit test for each one. The handling is kept in the shaping
+layer and counted on `HealthExSummary.dataQualityFlags` / `patientIdentities`
+so it is always auditable from the tests and READMEs, without cluttering the UI.
+
+### Gap A — "Absence" encoded as a positive record
+
+HealthEx sometimes returns an `AllergyIntolerance` with SNOMED `716186003`
+(`"No known allergy"`), `clinicalStatus = active`, `verificationStatus =
+confirmed`. A naive consumer renders this as `"You have an active allergy: No
+Known Allergies"` and a naive rules engine treats it as a real finding.
+
+How we handle it: [src/lib/healthex-summary.ts](src/lib/healthex-summary.ts)
+suppresses SNOMED `716186003`, `409137002`, and `429625007` sentinels before the
+section is built, counts the suppressions on `dataQualityFlags`, and surfaces
+`"No allergies on file."` instead.
+
+Test: Test 1 in
+[src/lib/__tests__/healthex-summary.test.ts](src/lib/__tests__/healthex-summary.test.ts)
+asserts a bundle containing only the sentinel AllergyIntolerance renders an empty
+allergies section with `sentinelAllergiesSuppressed === 1`.
+
+### Gap B — Multiple Patient identities linked from one Person
+
+The hydrated response contains a `Person` whose `link[]` points at two different
+`Patient/{id}` references, and clinical resources attach to either one. A
+consumer that assumes `Person.id === Patient.id` silently drops half the record.
+This is the enterprise master-patient-index (eMPI) shape any production
+integration will hit.
+
+How we handle it: `buildSummaryFromBundle` refuses to filter by a single Patient
+ID (locked in with a `// contract:` comment), walks `Person.link` plus every
+`subject.reference` and `patient.reference`, and exposes the reconciled identity
+set as `summary.patientIdentities` so downstream consumers (and the opening
+chart summary) can reason over every identity linked to the Person.
+
+Test: Test 2 asserts a bundle with a Person linked to two Patient IDs keeps one
+Observation under one Patient and one Immunization under the other in the
+rendered tabs.
+
+### Gap C — Same vaccine, drifting display text
+
+Phase 2 already observed that 59 raw `Immunization` resources collapse to ~27
+rows. The reason is that HealthEx returns the administering system's free-text
+product label (`"Tdap"`, `"Tdap #2"`, `"Tdap Adacel"`) while the CVX code stays
+constant. Any gap analysis keyed off the text will over-count distinct vaccines
+and under-count doses of each.
+
+How we handle it: `buildImmunizationItems` groups by CVX first and falls back to
+label normalization only when CVX is absent. The CVX code is surfaced in the
+item metadata so the reviewer sees `"CVX 115"` inline.
+
+Test: Test 3 asserts three Immunization resources sharing CVX `115` but with
+different display text roll up into one row with `occurrenceCount === 3` and a
+`"CVX 115"` chip.
+
+## Running Tests
+
+```bash
+npm run test          # one-shot vitest pass
+npm run test:watch    # interactive mode
+```
+
+The three production-grade tests in
+[src/lib/__tests__/healthex-summary.test.ts](src/lib/__tests__/healthex-summary.test.ts)
+exercise the gap handlers above on purpose-built minimal FHIR bundles. No
+network calls, no OpenAI key, no live token required.
+
+## Chart Conversation
+
+The chart summary card is the chat. On every live bundle load it streams an
+opening three-paragraph reviewer summary as the first assistant turn, and the
+same card carries a compose box for grounded follow-ups.
+
+To add a record as extra context, **double-click any row** in the clinical
+review tabs. Pinned rows get a subtle orange left-accent and dot so you can see
+state. Double-click again to unpin. Pin records from any combination of tabs
+(for example one immunization, one titer lab, one medication) and ask the
+assistant a grounded question like `"Given these records, do I appear immune to
+hep B?"`. Up to 12 pins at once, and each pin sends its most recent 10
+occurrences to keep the token budget predictable.
+
+Pins travel inline with each user turn as tiny chips, so past answers keep
+their original context even if the current pin set changes later. Cmd/Ctrl +
+Enter sends.
+
+The conversational card lives in
+[src/components/streaming-chart-summary.tsx](src/components/streaming-chart-summary.tsx).
+The opening summary streams from
+[src/app/api/chart-summary/route.ts](src/app/api/chart-summary/route.ts) and
+follow-up turns stream from
+[src/app/api/record-chat/route.ts](src/app/api/record-chat/route.ts). Selection
+state is shared via
+[src/lib/record-selection.ts](src/lib/record-selection.ts) so the tabs and the
+chat card see the same pins.
 
 ## Tradeoffs So Far
 

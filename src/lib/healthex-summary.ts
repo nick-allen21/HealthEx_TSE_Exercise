@@ -35,6 +35,10 @@ type FhirReference = {
   reference?: string;
 };
 
+type PersonLink = {
+  target?: FhirReference;
+};
+
 export type FhirResource = {
   resourceType?: string;
   id?: string;
@@ -64,6 +68,7 @@ export type FhirResource = {
   date?: string;
   contentType?: string;
   meta?: { source?: string };
+  link?: PersonLink[];
 };
 
 export type BundleEntry = {
@@ -125,12 +130,26 @@ export type ClinicalSection = {
   type: SupportedType;
 };
 
+export type PatientIdentities = {
+  mergedCount: number;
+  patientIds: string[];
+  personId: string | null;
+};
+
+export type DataQualityFlags = {
+  immunizationsGroupedByCvx: number;
+  mergedPatientIdentities: number;
+  sentinelAllergiesSuppressed: number;
+};
+
 export type HealthExSummary = {
   binaryCount: number;
+  dataQualityFlags: DataQualityFlags;
   documentHeavy: boolean;
   lastPulledLabel: string;
   leadTypes: SupportedType[];
   notes: string[];
+  patientIdentities: PatientIdentities;
   patientName: string;
   resourceCounts: Record<string, number>;
   sections: ClinicalSection[];
@@ -138,6 +157,77 @@ export type HealthExSummary = {
   supportedResourceTotal: number;
   tabs: ClinicalTab[];
 };
+
+const SENTINEL_ALLERGY_SNOMED = new Set([
+  "716186003",
+  "409137002",
+  "429625007",
+  "716186003",
+]);
+
+const CVX_SYSTEM_HINT = "cvx";
+
+function pickCvxCode(concept?: CodeableConcept): string | undefined {
+  const coding = concept?.coding?.find(
+    (entry) => entry.code && (entry.system ?? "").toLowerCase().includes(CVX_SYSTEM_HINT),
+  );
+  return coding?.code;
+}
+
+function isSentinelAllergy(resource: FhirResource) {
+  return (
+    resource.code?.coding?.some(
+      (coding) => coding.code && SENTINEL_ALLERGY_SNOMED.has(coding.code),
+    ) ?? false
+  );
+}
+
+function collectPatientIdentities(resources: FhirResource[]): PatientIdentities {
+  const person = resources.find((resource) => resource.resourceType === "Person");
+  const personId = person?.id ?? null;
+  const seen = new Set<string>();
+
+  for (const link of person?.link ?? []) {
+    const id = extractPatientId(link.target?.reference);
+    if (id) {
+      seen.add(id);
+    }
+  }
+
+  for (const resource of resources) {
+    if (resource.resourceType === "Person" || resource.resourceType === "Patient") {
+      continue;
+    }
+
+    const subjectId = extractPatientId(resource.subject?.reference);
+    const patientId = extractPatientId(resource.patient?.reference);
+
+    if (subjectId) {
+      seen.add(subjectId);
+    }
+
+    if (patientId) {
+      seen.add(patientId);
+    }
+  }
+
+  const patientIds = [...seen].sort();
+
+  return {
+    mergedCount: patientIds.length,
+    patientIds,
+    personId,
+  };
+}
+
+function extractPatientId(reference?: string) {
+  if (!reference) {
+    return undefined;
+  }
+
+  const match = /(?:^|\/)Patient\/([^/?#]+)/.exec(reference);
+  return match?.[1];
+}
 
 export function formatDisplayDate(value?: string) {
   if (!value) {
@@ -476,11 +566,16 @@ function normalizeVaccineLabel(label: string) {
     .toLowerCase();
 }
 
-function buildImmunizationItems(sectionResources: FhirResource[]): ClinicalItem[] {
+function buildImmunizationItems(sectionResources: FhirResource[]): {
+  collapsedDoseVariants: number;
+  items: ClinicalItem[];
+} {
   const groups = new Map<
     string,
     {
+      cvxCode?: string;
       displayLabel: string;
+      labelKeys: Set<string>;
       occurrences: ClinicalOccurrence[];
       statuses: string[];
     }
@@ -488,16 +583,22 @@ function buildImmunizationItems(sectionResources: FhirResource[]): ClinicalItem[
 
   for (const resource of sectionResources) {
     const originalLabel = pickCodeText(resource.vaccineCode);
-    const key = normalizeVaccineLabel(originalLabel) || originalLabel.toLowerCase();
+    const labelKey = normalizeVaccineLabel(originalLabel) || originalLabel.toLowerCase();
+    const cvxCode = pickCvxCode(resource.vaccineCode);
+    const key = cvxCode ? `cvx:${cvxCode}` : `label:${labelKey}`;
     const date = resource.occurrenceDateTime;
     const sortTime = parseSortTime(date);
     const status = resource.status;
 
     const group = groups.get(key) ?? {
+      cvxCode,
       displayLabel: originalLabel,
+      labelKeys: new Set<string>(),
       occurrences: [],
       statuses: [],
     };
+
+    group.labelKeys.add(labelKey);
 
     const trailingNumber = /\s*#?\s*\d+\s*$/;
     const candidateClean = !trailingNumber.test(originalLabel);
@@ -525,11 +626,22 @@ function buildImmunizationItems(sectionResources: FhirResource[]): ClinicalItem[
     groups.set(key, group);
   }
 
-  return [...groups.values()]
+  let collapsedDoseVariants = 0;
+
+  const items = [...groups.values()]
     .map((group) => {
       const sorted = sortOccurrencesLatestFirst(group.occurrences);
       const latest = sorted[0];
       const latestSortTime = latest?.sortTime ?? Number.NEGATIVE_INFINITY;
+
+      if (group.labelKeys.size > 1) {
+        collapsedDoseVariants += group.labelKeys.size - 1;
+      }
+
+      const metadata = [
+        group.cvxCode ? `CVX ${group.cvxCode}` : undefined,
+        ...group.statuses,
+      ].filter((value): value is string => Boolean(value));
 
       return {
         label: group.displayLabel,
@@ -538,7 +650,7 @@ function buildImmunizationItems(sectionResources: FhirResource[]): ClinicalItem[
         description: latest?.dateLabel
           ? `Most recent dose: ${latest.dateLabel}`
           : "Recorded in immunization history",
-        metadata: group.statuses,
+        metadata,
         occurrences: sorted,
         latestSortTime,
       };
@@ -559,6 +671,8 @@ function buildImmunizationItems(sectionResources: FhirResource[]): ClinicalItem[
       return left.label.localeCompare(right.label);
     })
     .map(({ latestSortTime: _unused, ...rest }) => rest);
+
+  return { collapsedDoseVariants, items };
 }
 
 function buildSingleOccurrenceEvent(
@@ -766,12 +880,18 @@ function buildSectionGuidance(
   return undefined;
 }
 
+type SectionBuildContext = {
+  immunizationCollapsedDoseVariants: number;
+  sentinelAllergiesSuppressed: number;
+};
+
 function buildSection(
   type: SupportedType,
   resources: FhirResource[],
   resourceCounts: Record<string, number>,
   leadTypes: SupportedType[],
   binaryCount: number,
+  buildContext: SectionBuildContext,
 ): ClinicalSection {
   const sectionResources = resources.filter((resource) => resource.resourceType === type);
   const status = buildSectionStatus(type, resourceCounts, leadTypes);
@@ -779,12 +899,32 @@ function buildSection(
   const guidance = buildSectionGuidance(type, status, resourceCounts, binaryCount);
 
   if (type === "AllergyIntolerance") {
+    const clinicalAllergies: FhirResource[] = [];
+    let suppressed = 0;
+
+    for (const resource of sectionResources) {
+      if (isSentinelAllergy(resource)) {
+        suppressed += 1;
+        continue;
+      }
+
+      clinicalAllergies.push(resource);
+    }
+
+    buildContext.sentinelAllergiesSuppressed += suppressed;
+
+    const effectiveCount = clinicalAllergies.length;
+    const emptyMessage =
+      suppressed > 0 && effectiveCount === 0
+        ? "No allergies on file. A sentinel 'no known allergy' record was suppressed so it does not render as an active diagnosis."
+        : "No allergy records were found in the current HealthEx bundle.";
+
     return {
-      count,
+      count: effectiveCount,
       displayMode: "events",
-      emptyMessage: "No allergy records were found in the current HealthEx bundle.",
+      emptyMessage,
       guidance,
-      items: sectionResources.map((resource) => ({
+      items: clinicalAllergies.map((resource) => ({
         label: pickCodeText(resource.code),
         description: pickCodingLabel(resource.clinicalStatus?.coding),
         metadata: [
@@ -845,15 +985,18 @@ function buildSection(
   }
 
   if (type === "Immunization") {
+    const { collapsedDoseVariants, items } = buildImmunizationItems(sectionResources);
+    buildContext.immunizationCollapsedDoseVariants += collapsedDoseVariants;
+
     return {
       count,
       displayMode: "rollup",
       emptyMessage: "No immunization resources are currently available in the current HealthEx bundle.",
       guidance,
-      items: buildImmunizationItems(sectionResources),
+      items,
       status,
       summaryCaption:
-        count > 0 ? "Grouped by vaccine and sorted by the most recent administration." : undefined,
+        count > 0 ? "Grouped by CVX code (falling back to vaccine name) and sorted by the most recent administration." : undefined,
       title: "Immunizations",
       type,
     };
@@ -973,6 +1116,8 @@ function buildSummaryNotes(
   resourceCounts: Record<string, number>,
   supportedResourceTotal: number,
   binaryCount: number,
+  dataQualityFlags: DataQualityFlags,
+  patientIdentities: PatientIdentities,
 ) {
   const notes: string[] = [];
 
@@ -998,6 +1143,24 @@ function buildSummaryNotes(
 
   if ((resourceCounts.Immunization ?? 0) === 0) {
     notes.push("Immunization data is not yet present in the current bundle.");
+  }
+
+  if (dataQualityFlags.sentinelAllergiesSuppressed > 0) {
+    notes.push(
+      `Suppressed ${dataQualityFlags.sentinelAllergiesSuppressed} 'no known allergy' sentinel record(s) so they do not render as active allergies.`,
+    );
+  }
+
+  if (dataQualityFlags.immunizationsGroupedByCvx > 0) {
+    notes.push(
+      `Collapsed ${dataQualityFlags.immunizationsGroupedByCvx} immunization dose-label variant(s) under their shared CVX code for accurate dose counting.`,
+    );
+  }
+
+  if (patientIdentities.mergedCount > 1) {
+    notes.push(
+      `Merged records from ${patientIdentities.mergedCount} HealthEx patient identities linked to this Person.`,
+    );
   }
 
   return notes;
@@ -1029,6 +1192,7 @@ export function buildSummaryFromBundle(
   bundle: FhirBundle,
   options?: { sourceFile?: string | null; lastPulledLabel?: string },
 ) {
+  // contract: do not filter clinical resources by a single Patient ID - see docs/phase5_extensions_validation.md Gap B.
   const resources = (bundle.entry ?? [])
     .map((entry) => entry.resource)
     .filter((resource): resource is FhirResource => Boolean(resource));
@@ -1044,18 +1208,37 @@ export function buildSummaryFromBundle(
     0,
   );
   const leadTypes = pickLeadTypes(resourceCounts);
-  const notes = buildSummaryNotes(leadTypes, resourceCounts, supportedResourceTotal, binaryCount);
+  const patientIdentities = collectPatientIdentities(resources);
+  const buildContext: SectionBuildContext = {
+    immunizationCollapsedDoseVariants: 0,
+    sentinelAllergiesSuppressed: 0,
+  };
   const sections = SUPPORTED_TYPES.map((type) =>
-    buildSection(type, resources, resourceCounts, leadTypes, binaryCount),
+    buildSection(type, resources, resourceCounts, leadTypes, binaryCount, buildContext),
   ).sort(sortSections);
+  const dataQualityFlags: DataQualityFlags = {
+    immunizationsGroupedByCvx: buildContext.immunizationCollapsedDoseVariants,
+    mergedPatientIdentities: patientIdentities.mergedCount > 1 ? patientIdentities.mergedCount : 0,
+    sentinelAllergiesSuppressed: buildContext.sentinelAllergiesSuppressed,
+  };
+  const notes = buildSummaryNotes(
+    leadTypes,
+    resourceCounts,
+    supportedResourceTotal,
+    binaryCount,
+    dataQualityFlags,
+    patientIdentities,
+  );
   const tabs = buildTabs(sections);
 
   return {
     binaryCount,
+    dataQualityFlags,
     documentHeavy: binaryCount > supportedResourceTotal,
     lastPulledLabel: options?.lastPulledLabel ?? "Recently",
     leadTypes,
     notes,
+    patientIdentities,
     patientName: pickPatientName(resources),
     resourceCounts,
     sections,
