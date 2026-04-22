@@ -99,7 +99,7 @@ Current phase-doc status:
 - `docs/phase2_fhir_queries_shaping.md`: active shaping and summary-section handoff
 - `docs/phase3_clinical_history_ui.md`: completed reviewer-facing chart shell, fallback decisions, grouped-summary presentation, streaming summary direction, final compact single-column review cleanup, per-section search / in-card expansion pass, the flat-tab restructure that drops Documents and Allergies, exposes a per-tab search input, and adds inline item-level sparkline / date-timeline expansion, and the chart polish + classification pass (non-clipping y-axis with a single unit caption, no value list under a chart, category-first vital/lab classification, UCUM unit prettifier, stronger narrative filter, immunization dose grouping, same-day medication dedupe, and an MCP-injection-safe `suppressHydrationWarning` on the root layout), plus a live-data verification pass and an immunization display-label tie-break that prefers a non-numeric variant when one is available
 - `docs/phase4_claude_immunization_skill.md`: active skill-package, recommendation-source, and Claude/MCP workflow handoff
-- `docs/phase5_extensions_validation.md`: delivers three HealthEx API-side data-quality gap handlers (sentinel allergies, multi-Patient identity reconciliation, CVX-first immunization grouping), three targeted vitest tests for those handlers, and the select-to-chat AI extension with a streaming `record-chat` API
+- `docs/phase5_extensions_validation.md`: delivers three HealthEx API-side data-quality gap handlers (sentinel allergies, multi-Patient identity reconciliation, CVX-first immunization grouping), three targeted vitest tests for those handlers, and the chart-as-chat AI extension (opening summary streams as the first turn of a grounded conversation, records are pinned via double-click, and follow-ups stream from `/api/record-chat`)
 - `docs/phase6_readme_submission.md`: reserved for evaluator-facing packaging
 
 ## Architecture Assumptions And Constraints
@@ -154,7 +154,7 @@ Current phase-doc status:
 | Sentinel allergy handling | Suppress SNOMED 716186003 / 409137002 / 429625007 in the shaping layer and surface the count on `dataQualityFlags.sentinelAllergiesSuppressed` | Prevents "No known allergy" records from rendering as active, confirmed findings for any consumer of `HealthExSummary` |
 | Multi-Patient identity reconciliation | Keep every clinical resource regardless of which Patient identity it was filed under, and expose the reconciled set as `summary.patientIdentities` with a no-filter contract comment in `buildSummaryFromBundle` | HealthEx Person records link to multiple Patient identities; filtering by one ID silently drops half of a real patient record |
 | CVX-first immunization grouping | Group Immunization resources by CVX code first, fall back to normalized label only when CVX is absent, and expose the shared CVX on `item.metadata` | Free-text `vaccineCode.text` drifts across doses of the same antigen; grouping by label over-counts distinct vaccines and under-counts doses |
-| Select-to-chat extension shape | Ship a floating pin + multi-turn streaming chat dock grounded only in user-selected records, through `src/app/api/record-chat/route.ts` and `src/lib/record-selection.ts` | Keeps the AI augmentation scoped, auditable, and useful on real heterogeneous bundles without requiring a general-purpose assistant panel |
+| Chart-as-chat extension shape | Merge the streaming chart summary and the record chat into a single conversational card: the opening `/api/chart-summary` stream is turn 1, follow-ups stream from `/api/record-chat`, and reviewers pin extra context by double-clicking any clinical-review row (pins snapshot onto each user turn). Implemented in `src/components/streaming-chart-summary.tsx`, `src/app/api/record-chat/route.ts`, and `src/lib/record-selection.ts`. | Keeps the AI augmentation scoped, auditable, and useful on real heterogeneous bundles without a separate assistant panel, and avoids cluttering the review surface with an explicit pin button or a floating dock |
 
 ### Open Decisions
 
@@ -243,7 +243,7 @@ Current phase-doc status:
 - [x] Identify the most critical logic worth testing
 - [x] Add focused tests only where they materially reduce risk
 - [x] Surface the three HealthEx API-side data-quality gaps we handle in code (sentinel allergies, multi-Patient identity reconciliation, CVX-first immunization grouping)
-- [x] Ship the creative AI extension (select-to-chat dock grounded only on pinned records)
+- [x] Ship the creative AI extension (chart-as-chat: streaming chart summary becomes turn 1 of a grounded conversation; reviewers double-click rows to pin extra context)
 - [ ] Verify the main technical flow end-to-end with the live browser-token path
 - [ ] Confirm the UI is readable with real patient data
 

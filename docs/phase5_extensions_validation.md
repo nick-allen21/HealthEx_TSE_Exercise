@@ -124,12 +124,13 @@ Removed:
 
 ## Known Open Items
 
-- The chat dock is intentionally single-purpose: no RAG over the full bundle,
-  no persistence across page refreshes, no tool calls. If we keep building in
-  this direction the obvious next stretch is a "Compare to CDC" button on the
-  Immunizations tab that reuses `dataQualityFlags.immunizationsGroupedByCvx`
-  and the bundled schedule JSON from the skill package.
+- The chat extension is intentionally single-purpose: no RAG over the full
+  bundle, no persistence across page refreshes, no tool calls. If we keep
+  building in this direction the obvious next stretch is a "Compare to CDC"
+  button on the Immunizations tab that reuses
+  `dataQualityFlags.immunizationsGroupedByCvx` and the bundled schedule JSON
+  from the skill package.
 - The chat extension assumes `OPENAI_API_KEY` is configured on the server; if
-  it is not, the dock shows the upstream 500 with a clear message.
+  it is not, the chat card surfaces the upstream 500 inline as an error.
 - The full end-to-end live-browser-token verification pass is still a Phase 6
   polish item rather than a Phase 5 blocker.
