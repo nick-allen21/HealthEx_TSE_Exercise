@@ -17,6 +17,8 @@ the exercise:
 ## Setup And Run
 
 ```bash
+git clone https://github.com/nick-allen21/HealthEx_TSE_Exercise.git
+cd HealthEx_TSE_Exercise
 conda env create -f environment.yml
 conda activate healthex-tse
 npm install
